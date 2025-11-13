@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "503247305701",
+    "project_id": "kids-2a3df",
+    "storage_bucket": "kids-2a3df.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:503247305701:android:61ae1e0cc1bed219eecd0c",
+        "android_client_info": {
+          "package_name": "com.roy.ngong"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "503247305701-aj2pdicpotiteu7jreri5ndv3rrkmten.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.roy.ngong",
+            "certificate_hash": "d35b748c6a3a21ce1819111435ddcbbecb5bfb9e"
+          }
+        },
+        {
+          "client_id": "503247305701-8qfb16j735pkqdarudlq6oontpk56onf.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBfwFQBfQeFO3L9OV5i7Al9vtGBY0TQbcY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "503247305701-8qfb16j735pkqdarudlq6oontpk56onf.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
