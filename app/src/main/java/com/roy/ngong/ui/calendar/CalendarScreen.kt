@@ -6,6 +6,7 @@ import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,14 +22,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -61,7 +60,6 @@ import com.kizitonwose.calendar.core.daysOfWeek
 import com.kizitonwose.calendar.core.nextMonth
 import com.kizitonwose.calendar.core.previousMonth
 import com.roy.ngong.data.Event
-import com.roy.ngong.navigation.AppDestinations
 import com.roy.ngong.ui.admin.AuthViewModel
 import kotlinx.coroutines.launch
 import java.time.DayOfWeek
@@ -80,7 +78,6 @@ fun CalendarScreen(
     authViewModel: AuthViewModel = viewModel()
 ) {
     val eventsByDate by calendarViewModel.events.collectAsState()
-    // FIX 1: Explicitly define the type for collectAsState
     val isAdmin by authViewModel.isAdmin.collectAsState(initial = false)
     var selectedDate by remember { mutableStateOf<LocalDate?>(LocalDate.now()) }
 
@@ -114,17 +111,6 @@ fun CalendarScreen(
                     containerColor = MaterialTheme.colorScheme.surfaceVariant
                 )
             )
-        },
-        floatingActionButton = {
-            // Only admins should see the add button; they will be routed to the Admin area
-            if (isAdmin) {
-                FloatingActionButton(onClick = {
-                    // Send admin to the Admin Dashboard where they can create calendar entries
-                    navController.navigate(AppDestinations.ADMIN_DASHBOARD_ROUTE)
-                }) {
-                    Icon(Icons.Default.Add, contentDescription = "Admin: Add Event")
-                }
-            }
         }
     ) { paddingValues ->
         Column(modifier = Modifier.padding(paddingValues)) {
@@ -135,7 +121,6 @@ fun CalendarScreen(
                 goToNext = { coroutineScope.launch { state.animateScrollToMonth(state.firstVisibleMonth.yearMonth.nextMonth) } },
             )
 
-            // FIX 3: Place the header OUTSIDE/ABOVE the HorizontalCalendar
             DaysOfWeekTitle(daysOfWeek = daysOfWeek)
 
             HorizontalCalendar(
@@ -149,7 +134,6 @@ fun CalendarScreen(
                         selectedDate = if (selectedDate == clickedDay.date) null else clickedDay.date
                     }
                 }
-                // The 'header' parameter does not exist, so it is removed.
             )
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp))
@@ -187,16 +171,22 @@ fun CalendarScreen(
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
 private fun Day(day: CalendarDay, isSelected: Boolean, hasEvent: Boolean, onClick: (CalendarDay) -> Unit) {
+    var modifier = Modifier
+        .aspectRatio(1f)
+        .padding(2.dp)
+        .clip(CircleShape)
+        .background(color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent)
+        .clickable(
+            enabled = day.position == DayPosition.MonthDate,
+            onClick = { onClick(day) }
+        )
+
+    if (hasEvent) {
+        modifier = modifier.border(2.dp, Color.Red, CircleShape)
+    }
+
     Box(
-        modifier = Modifier
-            .aspectRatio(1f)
-            .padding(2.dp)
-            .clip(CircleShape)
-            .background(color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent)
-            .clickable(
-                enabled = day.position == DayPosition.MonthDate,
-                onClick = { onClick(day) }
-            ),
+        modifier = modifier,
         contentAlignment = Alignment.Center
     ) {
         Column(

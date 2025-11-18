@@ -29,31 +29,32 @@ fun AddEditEventScreen(
     dateString: String, // Will be "new_event" or a specific date like "2024-11-13"
     calendarViewModel: CalendarViewModel = viewModel()
 ) {
-    // Determine mode first
-    val isNewEventFromAdmin = (dateString == "new_event")
+    val isNewEvent = dateString == "new_event"
 
-    // Load event data BEFORE creating state - use the first event for the date (if any)
-    val existingEvent = if (!isNewEventFromAdmin) {
+    val initialDate = if (isNewEvent) {
+        LocalDate.now()
+    } else {
+        try {
+            LocalDate.parse(dateString)
+        } catch (e: Exception) {
+            LocalDate.now() // Fallback to today if parsing fails
+        }
+    }
+
+    val existingEvent = if (!isNewEvent) {
         calendarViewModel.events.collectAsState().value[dateString]?.firstOrNull()
     } else {
         null
     }
 
-    // Initialize state with loaded data
     var title by remember { mutableStateOf(existingEvent?.title.orEmpty()) }
     var description by remember { mutableStateOf(existingEvent?.description.orEmpty()) }
-
-    // Determine mode and manage the selected date
-    var selectedDate by remember {
-        mutableStateOf(
-            if (isNewEventFromAdmin) LocalDate.now() else LocalDate.parse(dateString)
-        )
-    }
+    var selectedDate by remember { mutableStateOf(initialDate) }
     var showDatePicker by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
 
-    val screenTitle = if (isNewEventFromAdmin) "Create New Event" else "Edit Event"
+    val screenTitle = if (existingEvent == null) "Create New Event" else "Edit Event"
     val formattedDisplayDate = selectedDate.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.LONG))
 
     Scaffold(
@@ -75,25 +76,37 @@ fun AddEditEventScreen(
                 .fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Conditionally show date picker or static date
-            if (isNewEventFromAdmin) {
-                // If creating from admin, allow changing the date
+            // The Box makes the whole area clickable.
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(enabled = isNewEvent) {
+                        // Only show the date picker if it's a new event where the date can be changed.
+                        if (isNewEvent) {
+                            showDatePicker = true
+                        }
+                    }
+            ) {
                 OutlinedTextField(
                     value = formattedDisplayDate,
                     onValueChange = {},
-                    readOnly = true,
                     label = { Text("Event Date") },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { showDatePicker = true },
-                    trailingIcon = { Icon(Icons.Default.DateRange, "Select Date") }
-                )
-            } else {
-                // If adding from calendar, just display the date
-                Text(
-                    text = "Adding event for: $formattedDisplayDate",
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(bottom = 8.dp)
+                    modifier = Modifier.fillMaxWidth(),
+                    readOnly = true,
+                    // Disable the text field to allow the Box's click to go through.
+                    enabled = false,
+                    // Override the colors to make it look like a normal, enabled text field.
+                    colors = OutlinedTextFieldDefaults.colors(
+                        disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                        disabledBorderColor = MaterialTheme.colorScheme.outline,
+                        disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    ),
+                    trailingIcon = {
+                        if (isNewEvent) {
+                            Icon(Icons.Default.DateRange, contentDescription = "Select Date")
+                        }
+                    }
                 )
             }
 
@@ -118,30 +131,26 @@ fun AddEditEventScreen(
 
             Button(
                 onClick = {
-                    // Use the dynamic `selectedDate`
                     val dateToSave = selectedDate.format(DateTimeFormatter.ISO_LOCAL_DATE)
-                    calendarViewModel.addEvent(title.trim(), description.trim(), dateToSave)
-
-                    // Navigate based on where the user came from
-                    if (isNewEventFromAdmin) {
-                        navController.navigate(AppDestinations.ADMIN_DASHBOARD_ROUTE) {
-                            popUpTo(AppDestinations.ADMIN_DASHBOARD_ROUTE) { inclusive = true }
-                        }
+                    if (existingEvent == null) {
+                        calendarViewModel.addEvent(title.trim(), description.trim(), dateToSave)
                     } else {
-                        navController.popBackStack()
+                        // Assuming you will add an updateEvent function to your ViewModel
+                        // calendarViewModel.updateEvent(existingEvent.copy(title = title.trim(), description = description.trim(), date = dateToSave))
                     }
+
+                    navController.popBackStack()
                 },
                 enabled = title.isNotBlank(),
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(50.dp)
             ) {
-                Text("Save Event")
+                Text(if (existingEvent == null) "Save Event" else "Update Event")
             }
         }
     }
 
-    // Use Android's DatePickerDialog for compatibility
     if (showDatePicker) {
         val year = selectedDate.year
         val month = selectedDate.monthValue - 1 // DatePickerDialog months are 0-based

@@ -151,10 +151,7 @@ fun AdminDashboardScreen(
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
                     containerColor = churchRed
-                ),
-                modifier = Modifier
-                    .padding(horizontal = 0.dp, vertical = 8.dp)
-                    .clip(RoundedCornerShape(12.dp))
+                )
             )
         },
         containerColor = if (isDarkMode) churchBlack else MaterialTheme.colorScheme.background
@@ -193,7 +190,7 @@ fun AdminDashboardScreen(
                 title = "Create Calendar Entry",
                 icon = Icons.Default.NoteAdd, // You will need to import this
                 iconTint = Color(0xFF006400), // A dark green color
-                onClick = { navController.navigate(AppDestinations.ADMIN_ADD_ENTRY_ROUTE) },
+                onClick = { navController.navigate(AppDestinations.addEditEventRoute("new_event")) },
                 isDarkMode = isDarkMode
             )
         }
@@ -464,7 +461,16 @@ fun AdminReportDetailScreen(
 
                             Spacer(Modifier.height(16.dp))
 
-                            logsInService.forEach { log ->
+                            val classOrder = listOf(
+                                "playgroup", "pp1", "pp2", "grade one", "grade 2", "grade 3",
+                                "grade 4", "grade 5", "grade 6", "grade 7", "hopes"
+                            )
+                            val sortedLogs = logsInService.sortedWith(compareBy { log ->
+                                val index = classOrder.indexOf(log.className.trim().lowercase(Locale.ROOT))
+                                if (index != -1) index else Int.MAX_VALUE
+                            })
+
+                            sortedLogs.forEach { log ->
                                 ReportLogItem(log)
                                 Spacer(modifier = Modifier.height(8.dp))
                             }

@@ -138,7 +138,7 @@ fun HomeScreen(
                     scope.launch { drawerState.close() }
                     onNavigateToPending()
                 },
-                        onCalendarClick = { // <-- 3. IMPLEMENT THE CLICK
+                onCalendarClick = { // <-- RE-ADDED THE CLICK HANDLER
                     scope.launch { drawerState.close() }
                     navController.navigate(AppDestinations.CALENDAR_ROUTE)
                 }
@@ -314,10 +314,7 @@ private fun HomeTopAppBar(
                     )
                 }
             }
-        },
-        modifier = Modifier
-            .padding(horizontal = 0.dp, vertical = 8.dp)
-            .clip(RoundedCornerShape(12.dp))
+        }
     )
 }
 
@@ -384,8 +381,8 @@ private fun AppDrawerContent(
             )
 
             DrawerButton(
-                text = "Event Calendar", // <-- 2. ADD THE NEW BUTTON
-                icon = Icons.Default.CalendarMonth, // You may need to add this import
+                text = "Event Calendar", // <-- RE-ADDED THE BUTTON
+                icon = Icons.Default.CalendarMonth,
                 onClick = onCalendarClick
             )
 

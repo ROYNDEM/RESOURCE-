@@ -34,10 +34,14 @@ import com.roy.ngong.R
 import com.roy.ngong.navigation.AppDestinations
 
 @Composable
-fun LoginScreen(navController: NavController) {
+fun LoginScreen(
+    navController: NavController,
+    onGoogleSignInClick: () -> Unit
+) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
+    var showForgotPasswordDialog by remember { mutableStateOf(false) }
     val auth = FirebaseAuth.getInstance()
     val context = LocalContext.current
 
@@ -65,15 +69,12 @@ fun LoginScreen(navController: NavController) {
                     .padding(bottom = 40.dp)
             )
 
-            // --- REMOVED THE SINGLE WRAPPING CARD ---
-
             // --- Email Field in its own Card ---
             Card(
                 shape = RoundedCornerShape(48.dp),
                 modifier = Modifier.fillMaxWidth(),
-                // You can now change the color of this card individually
                 colors = CardDefaults.cardColors(containerColor = Color(0xFFF0F0F0)),
-                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp) // Add a subtle shadow
+                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
             ) {
                 OutlinedTextField(
                     shape = RoundedCornerShape(48.dp),
@@ -83,12 +84,11 @@ fun LoginScreen(navController: NavController) {
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                    // Make the TextField transparent to show the Card's color
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedContainerColor = Color.Transparent,
                         unfocusedContainerColor = Color.Transparent,
-                        focusedBorderColor = Color.Transparent, // Hide the border
-                        unfocusedBorderColor = Color.Transparent // Hide the border
+                        focusedBorderColor = Color.Transparent,
+                        unfocusedBorderColor = Color.Transparent
                     )
                 )
             }
@@ -99,8 +99,7 @@ fun LoginScreen(navController: NavController) {
             Card(
                 shape = RoundedCornerShape(48.dp),
                 modifier = Modifier.fillMaxWidth(),
-                // Example: Making this card a different color
-                colors = CardDefaults.cardColors(containerColor = Color(0xFFF0F0F0)), // A light grey
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFF0F0F0)),
                 elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
             ) {
                 OutlinedTextField(
@@ -112,16 +111,14 @@ fun LoginScreen(navController: NavController) {
                     singleLine = true,
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                    // Make the TextField transparent to show the Card's color
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedContainerColor = Color.Transparent,
                         unfocusedContainerColor = Color.Transparent,
-                        focusedBorderColor = Color.Transparent, // Hide the border
-                        unfocusedBorderColor = Color.Transparent // Hide the border
+                        focusedBorderColor = Color.Transparent,
+                        unfocusedBorderColor = Color.Transparent
                     )
                 )
             }
-
 
             Spacer(modifier = Modifier.height(32.dp))
 
@@ -157,19 +154,105 @@ fun LoginScreen(navController: NavController) {
                 }
             }
 
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // --- Google Sign-In Button ---
+            Button(
+                onClick = onGoogleSignInClick,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(50.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
+                shape = RoundedCornerShape(48.dp),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 8.dp, pressedElevation = 4.dp)
+            ) {
+                Image(
+                    painter = painterResource(id = R.drawable.google_icon_logo_svgrepo_com),
+                    contentDescription = "Google Logo",
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Sign in with Google")
+            }
+
             Spacer(modifier = Modifier.height(24.dp))
 
-            // --- "Create Account" Text Button ---
-            ClickableText(
-                text = AnnotatedString("Don't have an account? Sign Up"),
-                onClick = { navController.navigate(AppDestinations.SIGN_UP_ROUTE) },
-                style = TextStyle(
-                    color = Color.Blue,
-                    textAlign = TextAlign.Center,
-                    textDecoration = TextDecoration.Underline,
-                    fontSize = 14.sp
+            // --- "Create Account" and "Forgot Password" Text Buttons ---
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                ClickableText(
+                    text = AnnotatedString("Don\'t have an account? Sign Up"),
+                    onClick = { navController.navigate(AppDestinations.SIGN_UP_ROUTE) },
+                    style = TextStyle(
+                        color = Color.Blue,
+                        textAlign = TextAlign.Center,
+                        textDecoration = TextDecoration.Underline,
+                        fontSize = 14.sp
+                    )
                 )
-            )
+                ClickableText(
+                    text = AnnotatedString("Forgot Password?"),
+                    onClick = { showForgotPasswordDialog = true },
+                    style = TextStyle(
+                        color = Color.Gray,
+                        textAlign = TextAlign.Center,
+                        textDecoration = TextDecoration.Underline,
+                        fontSize = 14.sp
+                    )
+                )
+            }
         }
     }
+
+    if (showForgotPasswordDialog) {
+        ForgotPasswordDialog(
+            onDismiss = { showForgotPasswordDialog = false },
+            onConfirm = {
+                auth.sendPasswordResetEmail(it)
+                    .addOnCompleteListener { task ->
+                        if (task.isSuccessful) {
+                            Toast.makeText(context, "Password reset email sent.", Toast.LENGTH_LONG).show()
+                        } else {
+                            Toast.makeText(context, "Failed to send reset email: ${task.exception?.message}", Toast.LENGTH_LONG).show()
+                        }
+                    }
+                showForgotPasswordDialog = false
+            }
+        )
+    }
+}
+
+@Composable
+fun ForgotPasswordDialog(onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
+    var email by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Reset Password") },
+        text = {
+            Column {
+                Text("Enter your email address to receive a password reset link.")
+                Spacer(modifier = Modifier.height(16.dp))
+                OutlinedTextField(
+                    value = email,
+                    onValueChange = { email = it },
+                    label = { Text("Email") },
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
+                )
+            }
+        },
+        confirmButton = {
+            Button(onClick = { onConfirm(email) }) {
+                Text("Send")
+            }
+        },
+        dismissButton = {
+            Button(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }

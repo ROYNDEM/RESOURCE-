@@ -7,6 +7,8 @@ import com.roy.ngong.ui.calendar.CalendarViewModel
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
 import androidx.annotation.RequiresApi
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
@@ -27,16 +29,19 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import androidx.navigation.navigation
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInClient
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.android.gms.common.api.ApiException
 import com.roy.ngong.navigation.AppDestinations
 import com.roy.ngong.ui.SplashScreen
 import com.roy.ngong.ui.admin.AdminDashboardScreen
 import com.roy.ngong.ui.admin.AdminManageControlsScreen
 import com.roy.ngong.ui.admin.AdminReportDetailScreen
 import com.roy.ngong.ui.admin.AdminReportsListScreen
-// import com.roy.ngong.ui.admin.AdminSignUpScreen // <-- REMOVED
 import com.roy.ngong.ui.admin.AppDataViewModel
 import com.roy.ngong.ui.admin.AuthViewModel
-import com.roy.ngong.ui.auth.LoginScreen // Keep the main login screen
+import com.roy.ngong.ui.auth.LoginScreen
 import com.roy.ngong.ui.auth.SignUpScreen
 import com.roy.ngong.ui.edit.ResourceEditScreen
 import com.roy.ngong.ui.home.HomeScreen
@@ -46,9 +51,31 @@ import com.roy.ngong.ui.resource.viewmodel.ResourceViewModel
 import com.roy.ngong.ui.theme.NGONGTheme
 
 class MainActivity : ComponentActivity() {
+    private lateinit var googleSignInClient: GoogleSignInClient
+    private val authViewModel: AuthViewModel by viewModels()
+
+    private val googleSignInLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+        try {
+            val account = task.getResult(ApiException::class.java)
+            account?.idToken?.let {
+                authViewModel.signInWithGoogle(it)
+            }
+        } catch (e: ApiException) {
+            // Handle sign-in failure
+        }
+    }
+
     @RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+            .requestIdToken(getString(R.string.default_web_client_id))
+            .requestEmail()
+            .build()
+        googleSignInClient = GoogleSignIn.getClient(this, gso)
+
         setContent {
             var isDarkMode by remember { mutableStateOf(false) }
             val onThemeToggle = { isDarkMode = !isDarkMode }
@@ -62,7 +89,11 @@ class MainActivity : ComponentActivity() {
                         modifier = Modifier.padding(innerPadding),
                         isDarkMode = isDarkMode,
                         onThemeToggle = onThemeToggle,
-                        snackbarHostState = snackbarHostState
+                        snackbarHostState = snackbarHostState,
+                        onGoogleSignInClick = {
+                            val signInIntent = googleSignInClient.signInIntent
+                            googleSignInLauncher.launch(signInIntent)
+                        }
                     )
                 }
             }
@@ -77,7 +108,8 @@ fun AppNavigator(
     modifier: Modifier = Modifier,
     isDarkMode: Boolean,
     onThemeToggle: () -> Unit,
-    snackbarHostState: SnackbarHostState
+    snackbarHostState: SnackbarHostState,
+    onGoogleSignInClick: () -> Unit
 ) {
     val navController = rememberNavController()
 
@@ -102,7 +134,7 @@ fun AppNavigator(
         }
 
         composable(AppDestinations.LOGIN_ROUTE) {
-            LoginScreen(navController = navController)
+            LoginScreen(navController = navController, onGoogleSignInClick = onGoogleSignInClick)
         }
 
         composable(AppDestinations.HOME_SCREEN_ROUTE) {

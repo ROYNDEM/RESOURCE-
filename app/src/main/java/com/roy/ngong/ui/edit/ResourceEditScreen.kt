@@ -127,6 +127,12 @@ fun ResourceEditScreen(
                             scope.launch {
                                 snackbarHostState.showSnackbar("Entry submitted successfully!")
                             }
+                        },
+                        onDelete = { logToDelete ->
+                            pendingViewModel.deleteLog(logToDelete)
+                            scope.launch {
+                                snackbarHostState.showSnackbar("Entry deleted.")
+                            }
                         }
                     )
                 }
@@ -142,6 +148,7 @@ private fun PendingEntryCard(
     onExpand: () -> Unit,
     onUpdate: (ClassSessionLog) -> Unit,
     onSubmit: (ClassSessionLog) -> Unit,
+    onDelete: (ClassSessionLog) -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -175,7 +182,7 @@ private fun PendingEntryCard(
 
             // This is the expandable part with the editable form.
             AnimatedVisibility(visible = isExpanded) {
-                EditableLogContent(log = log, onUpdate = onUpdate, onSubmit = onSubmit)
+                EditableLogContent(log = log, onUpdate = onUpdate, onSubmit = onSubmit, onDelete = onDelete)
             }
         }
     }
@@ -185,7 +192,8 @@ private fun PendingEntryCard(
 private fun EditableLogContent(
     log: ClassSessionLog,
     onUpdate: (ClassSessionLog) -> Unit,
-    onSubmit: (ClassSessionLog) -> Unit
+    onSubmit: (ClassSessionLog) -> Unit,
+    onDelete: (ClassSessionLog) -> Unit
 ) {
     // State for all editable fields, initialized from the log data.
     // `remember(log.id)` ensures the state resets if a different log is displayed.
@@ -240,7 +248,7 @@ private fun EditableLogContent(
 
         Spacer(modifier = Modifier.height(6.dp))
 
-        // Action buttons (Update and Submit)
+        // Action buttons (Update, Delete, and Submit)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.End,
@@ -251,6 +259,13 @@ private fun EditableLogContent(
                 enabled = !isSubmitting
             ) {
                 Text("Update")
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            OutlinedButton(
+                onClick = { onDelete(log) },
+                enabled = !isSubmitting
+            ) {
+                Text("Delete")
             }
             Spacer(modifier = Modifier.width(8.dp))
             Button(

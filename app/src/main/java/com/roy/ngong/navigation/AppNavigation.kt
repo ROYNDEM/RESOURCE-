@@ -15,8 +15,12 @@ object AppDestinations {
     const val ADMIN_REPORTS_LIST_ROUTE = "admin_reports_list"
     const val ADMIN_REPORTS_DETAIL_ROUTE = "admin_reports_detail/{date}"
     const val ADMIN_ADD_ENTRY_ROUTE = "admin_add_entry"
-    fun reportDetailRoute(date: String): String{
+
+    fun reportDetailRoute(date: String): String {
         return "admin_reports_detail/$date"
     }
-}
 
+    fun addEditEventRoute(date: String): String {
+        return "add_edit_event/$date"
+    }
+}
