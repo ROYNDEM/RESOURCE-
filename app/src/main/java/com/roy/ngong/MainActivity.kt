@@ -134,7 +134,11 @@ fun AppNavigator(
         }
 
         composable(AppDestinations.LOGIN_ROUTE) {
-            LoginScreen(navController = navController, onGoogleSignInClick = onGoogleSignInClick)
+            LoginScreen(
+                navController = navController, 
+                onGoogleSignInClick = onGoogleSignInClick,
+                authViewModel = authViewModel
+            )
         }
 
         composable(AppDestinations.HOME_SCREEN_ROUTE) {

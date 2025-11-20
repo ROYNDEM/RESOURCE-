@@ -8,7 +8,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.ClickableText
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
@@ -20,32 +19,69 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.ExperimentalTextApi
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.google.firebase.auth.FirebaseAuth
 import com.roy.ngong.R
 import com.roy.ngong.navigation.AppDestinations
+import com.roy.ngong.ui.admin.AuthViewModel
+import com.roy.ngong.ui.admin.AuthStatus
 
+@OptIn(ExperimentalTextApi::class)
 @Composable
 fun LoginScreen(
     navController: NavController,
-    onGoogleSignInClick: () -> Unit
+    onGoogleSignInClick: () -> Unit,
+    authViewModel: AuthViewModel
 ) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    var isLoading by remember { mutableStateOf(false) }
     var showForgotPasswordDialog by remember { mutableStateOf(false) }
     val auth = FirebaseAuth.getInstance()
     val context = LocalContext.current
 
-    val primaryColor = Color(0xFFD32F2F) // Red
+    val authStatus by authViewModel.authStatus.collectAsState()
+    val isLoading = authStatus == AuthStatus.LOADING
+
+    // --- Annotated Strings for Links ---
+    val signUpAnnotatedString = buildAnnotatedString {
+        append("Don't have an account? ")
+        pushLink(LinkAnnotation.Clickable("signup") {
+            navController.navigate(AppDestinations.SIGN_UP_ROUTE)
+        })
+        withStyle(style = SpanStyle(color = Color.Blue, textDecoration = TextDecoration.Underline)) {
+            append("Sign Up")
+        }
+        pop()
+    }
+
+    val forgotPasswordAnnotatedString = buildAnnotatedString {
+        pushLink(LinkAnnotation.Clickable("forgot") {
+            showForgotPasswordDialog = true
+        })
+        withStyle(style = SpanStyle(color = Color.Gray, textDecoration = TextDecoration.Underline)) {
+            append("Forgot Password?")
+        }
+        pop()
+    }
+
+    LaunchedEffect(authStatus) {
+        if (authStatus == AuthStatus.SUCCESS) {
+            navController.navigate(AppDestinations.HOME_SCREEN_ROUTE) {
+                popUpTo(AppDestinations.LOGIN_ROUTE) { inclusive = true }
+            }
+            authViewModel.resetStatus()
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -124,31 +160,20 @@ fun LoginScreen(
 
             // --- Login Button ---
             if (isLoading) {
-                CircularProgressIndicator(color = primaryColor)
+                CircularProgressIndicator(color = Color(0xFFD32F2F))
             } else {
-                Button(
+                ElevatedButton(
                     onClick = {
                         if (email.isNotBlank() && password.isNotBlank()) {
-                            isLoading = true
-                            auth.signInWithEmailAndPassword(email, password)
-                                .addOnCompleteListener { task ->
-                                    isLoading = false
-                                    if (task.isSuccessful) {
-                                        navController.navigate(AppDestinations.HOME_SCREEN_ROUTE) {
-                                            popUpTo(AppDestinations.LOGIN_ROUTE) { inclusive = true }
-                                        }
-                                    } else {
-                                        Toast.makeText(context, "Login Failed: ${task.exception?.message}", Toast.LENGTH_LONG).show()
-                                    }
-                                }
+                            authViewModel.login(email, password)
                         }
                     },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(50.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = primaryColor),
+                    colors = ButtonDefaults.elevatedButtonColors(containerColor = Color(0xFFD32F2F)),
                     shape = RoundedCornerShape(48.dp),
-                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 8.dp, pressedElevation = 4.dp)
+                    elevation = ButtonDefaults.elevatedButtonElevation(defaultElevation = 8.dp, pressedElevation = 4.dp)
                 ) {
                     Text("Login", style = MaterialTheme.typography.titleMedium)
                 }
@@ -157,17 +182,17 @@ fun LoginScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             // --- Google Sign-In Button ---
-            Button(
+            ElevatedButton(
                 onClick = onGoogleSignInClick,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(50.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
+                colors = ButtonDefaults.elevatedButtonColors(containerColor = Color.White, contentColor = Color.Black),
                 shape = RoundedCornerShape(48.dp),
-                elevation = ButtonDefaults.buttonElevation(defaultElevation = 8.dp, pressedElevation = 4.dp)
+                elevation = ButtonDefaults.elevatedButtonElevation(defaultElevation = 8.dp, pressedElevation = 4.dp)
             ) {
                 Image(
-                    painter = painterResource(id = R.drawable.google_icon_logo_svgrepo_com),
+                    painter = painterResource(id = R.drawable.ic_google_logo),
                     contentDescription = "Google Logo",
                     modifier = Modifier.size(24.dp)
                 )
@@ -182,26 +207,8 @@ fun LoginScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                ClickableText(
-                    text = AnnotatedString("Don\'t have an account? Sign Up"),
-                    onClick = { navController.navigate(AppDestinations.SIGN_UP_ROUTE) },
-                    style = TextStyle(
-                        color = Color.Blue,
-                        textAlign = TextAlign.Center,
-                        textDecoration = TextDecoration.Underline,
-                        fontSize = 14.sp
-                    )
-                )
-                ClickableText(
-                    text = AnnotatedString("Forgot Password?"),
-                    onClick = { showForgotPasswordDialog = true },
-                    style = TextStyle(
-                        color = Color.Gray,
-                        textAlign = TextAlign.Center,
-                        textDecoration = TextDecoration.Underline,
-                        fontSize = 14.sp
-                    )
-                )
+                Text(text = signUpAnnotatedString, fontSize = 14.sp)
+                Text(text = forgotPasswordAnnotatedString, fontSize = 14.sp)
             }
         }
     }
@@ -245,12 +252,12 @@ fun ForgotPasswordDialog(onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
             }
         },
         confirmButton = {
-            Button(onClick = { onConfirm(email) }) {
+            TextButton(onClick = { onConfirm(email) }) {
                 Text("Send")
             }
         },
         dismissButton = {
-            Button(onClick = onDismiss) {
+            TextButton(onClick = onDismiss) {
                 Text("Cancel")
             }
         }
