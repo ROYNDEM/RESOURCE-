@@ -1,3 +1,5 @@
 <resources>
-    <string name="app_name">NGONG</string>
+    <string name="app_name">RESOURCE</string>
+    <!-- Placeholder for Google Sign-In OAuth client ID. Replace with the web client ID from your Firebase console. -->
+    <string name="default_web_client_id">503247305701-8qfb16j735pkqdarudlq6oontpk56onf.apps.googleusercontent.com</string>
 </resources>
