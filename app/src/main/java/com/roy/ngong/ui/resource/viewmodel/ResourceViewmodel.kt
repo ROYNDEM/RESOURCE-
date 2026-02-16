@@ -7,13 +7,13 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
 import com.roy.ngong.data.ClassSessionLog
+import com.roy.ngong.data.SundayResourceInventory
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Locale
-import kotlin.jvm.java
 
 class ResourceViewModel : ViewModel() {
 
@@ -21,6 +21,7 @@ class ResourceViewModel : ViewModel() {
 
     // This will hold the listener registration so we can detach it later
     private var logsListener: ListenerRegistration? = null
+    private var inventoryListener: ListenerRegistration? = null
 
     // This map will cache the logs once fetched.
     private val _logsByDate = MutableStateFlow<Map<String, List<ClassSessionLog>>>(emptyMap())
@@ -33,20 +34,17 @@ class ResourceViewModel : ViewModel() {
     private val _selectedDateLogs = MutableStateFlow<List<ClassSessionLog>>(emptyList())
     val selectedDateLogs: StateFlow<List<ClassSessionLog>> = _selectedDateLogs.asStateFlow()
 
-    // The init block is now empty. No work is done on startup.
+    // Inventory Data
+    private val _inventoryRecords = MutableStateFlow<List<SundayResourceInventory>>(emptyList())
+    val inventoryRecords: StateFlow<List<SundayResourceInventory>> = _inventoryRecords.asStateFlow()
+
     init {
-        Log.d("ResourceViewModel", "ViewModel initialized. No data fetched yet.")
+        Log.d("ResourceViewModel", "ViewModel initialized.")
     }
 
-    /**
-     * This function is now called ON-DEMAND from the UI (e.g., AdminReportsListScreen).
-     * It attaches the listener to Firestore.
-     */
     fun startListeningForLogs() {
-        // If the listener is already active, don't create a new one.
         if (logsListener != null) return
 
-        Log.d("ResourceViewModel", "Starting to listen for session logs.")
         logsListener = db.collection("class_session_logs")
             .orderBy("sessionDate", Query.Direction.DESCENDING)
             .addSnapshotListener { snapshots, error ->
@@ -56,11 +54,27 @@ class ResourceViewModel : ViewModel() {
                 }
 
                 if (snapshots != null) {
-                    viewModelScope.launch { // Process data inside a coroutine
+                    viewModelScope.launch {
                         val logs = snapshots.toObjects(ClassSessionLog::class.java)
                         processLogsByDate(logs)
-                        Log.d("ResourceViewModel", "Fetched and processed ${logs.size} logs.")
                     }
+                }
+            }
+    }
+
+    fun startListeningForInventory() {
+        if (inventoryListener != null) return
+
+        inventoryListener = db.collection("sunday_inventory")
+            .orderBy("date", Query.Direction.DESCENDING)
+            .addSnapshotListener { snapshots, error ->
+                if (error != null) {
+                    Log.w("ResourceViewModel", "Inventory listen failed.", error)
+                    return@addSnapshotListener
+                }
+
+                if (snapshots != null) {
+                    _inventoryRecords.value = snapshots.toObjects(SundayResourceInventory::class.java)
                 }
             }
     }
@@ -76,9 +90,6 @@ class ResourceViewModel : ViewModel() {
         }
     }
 
-    /**
-     * Prepares the report details for a single date.
-     */
     fun loadReportForDate(dateString: String) {
         _selectedDateLogs.value = _logsByDate.value[dateString] ?: emptyList()
     }
@@ -89,13 +100,19 @@ class ResourceViewModel : ViewModel() {
             .addOnFailureListener { e -> Log.e("Firestore", "Error saving log", e) }
     }
 
-    /**
-     * This is a crucial cleanup function. It detaches the Firestore listener
-     * when the ViewModel is about to be destroyed, preventing memory leaks.
-     */
+    fun saveInventoryRecord(record: SundayResourceInventory, onSuccess: () -> Unit, onFailure: (Exception) -> Unit) {
+        db.collection("sunday_inventory").document(record.date).set(record)
+            .addOnSuccessListener {
+                onSuccess()
+            }
+            .addOnFailureListener { e ->
+                onFailure(e)
+            }
+    }
+
     override fun onCleared() {
         super.onCleared()
-        Log.d("ResourceViewModel", "ViewModel cleared. Detaching Firestore listener.")
         logsListener?.remove()
+        inventoryListener?.remove()
     }
 }

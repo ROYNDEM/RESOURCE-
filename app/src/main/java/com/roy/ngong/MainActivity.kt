@@ -36,6 +36,7 @@ import com.google.android.gms.common.api.ApiException
 import com.roy.ngong.navigation.AppDestinations
 import com.roy.ngong.ui.SplashScreen
 import com.roy.ngong.ui.admin.AdminDashboardScreen
+import com.roy.ngong.ui.admin.AdminInventoryScreen
 import com.roy.ngong.ui.admin.AdminManageControlsScreen
 import com.roy.ngong.ui.admin.AdminReportDetailScreen
 import com.roy.ngong.ui.admin.AdminReportsListScreen
@@ -273,6 +274,15 @@ fun NavGraphBuilder.adminNavGraph(
                 onNavigateBack = { navController.popBackStack() }
             )
         }
+        
+        composable(AppDestinations.ADMIN_INVENTORY_ROUTE) {
+            AdminInventoryScreen(
+                resourceViewModel = resourceViewModel,
+                authViewModel = authViewModel,
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
         composable(
             route = AppDestinations.ADMIN_REPORTS_DETAIL_ROUTE,
             arguments = listOf(navArgument("date") { type = NavType.StringType })

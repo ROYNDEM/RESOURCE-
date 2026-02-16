@@ -24,7 +24,9 @@ import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Inventory
 import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.NoteAdd
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
@@ -52,7 +54,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -68,8 +69,6 @@ import com.roy.ngong.navigation.AppDestinations
 import com.roy.ngong.ui.resource.viewmodel.ResourceViewModel
 import java.text.SimpleDateFormat
 import java.util.Locale
-
-import androidx.compose.material.icons.filled.NoteAdd
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -186,7 +185,16 @@ fun AdminDashboardScreen(
                 onClick = { navController.navigate(AppDestinations.ADMIN_MANAGE_CONTROLS_ROUTE) },
                 isDarkMode = isDarkMode
             )
-                 AdminDashboardCard(
+            
+            AdminDashboardCard(
+                title = "Sunday Inventory",
+                icon = Icons.Default.Inventory,
+                iconTint = Color(0xFFFFA000), // Amber color
+                onClick = { navController.navigate(AppDestinations.ADMIN_INVENTORY_ROUTE) },
+                isDarkMode = isDarkMode
+            )
+            
+            AdminDashboardCard(
                 title = "Create Calendar Entry",
                 icon = Icons.Default.NoteAdd, // You will need to import this
                 iconTint = Color(0xFF006400), // A dark green color

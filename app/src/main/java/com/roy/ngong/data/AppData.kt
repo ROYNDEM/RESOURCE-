@@ -5,3 +5,10 @@ data class GeneralData(
     val verseOfTheDay: String = "",
     val announcement: String = ""
 )
+
+data class SundayResourceInventory(
+    val date: String = "",
+    val biscuitBoxes: Int = 0,
+    val printingReams: Int = 0,
+    val recordedBy: String = ""
+)
