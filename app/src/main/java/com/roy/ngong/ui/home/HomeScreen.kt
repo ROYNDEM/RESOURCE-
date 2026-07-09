@@ -40,7 +40,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.NoteAdd
+import androidx.compose.material.icons.automirrored.filled.NoteAdd
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -71,7 +71,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
@@ -83,12 +82,17 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import com.roy.ngong.R
 import com.roy.ngong.navigation.AppDestinations
 import com.roy.ngong.ui.admin.AppDataViewModel
+import com.roy.ngong.ui.dvbs.DVBSScreen
+import com.roy.ngong.ui.dvbs.DVBSViewModel
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import kotlinx.coroutines.launch
 
 
@@ -171,30 +175,65 @@ fun HomeScreen(
             containerColor = if (isDarkMode) darkModeBackground else lightModeBackground
         ) { paddingValues ->
             val data by appDataViewModel.generalData.collectAsState()
+            val pagerState = rememberPagerState(pageCount = { 2 })
+            val dvbsViewModel: DVBSViewModel = viewModel()
 
-            Column(
+            HorizontalPager(
+                state = pagerState,
                 modifier = Modifier
                     .padding(paddingValues)
                     .fillMaxSize()
-                    .padding(16.dp)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(20.dp)
-            ) {
-                InfoCard(
-                    title = "Verse of the Day",
-                    content = data.verseOfTheDay,
-                    icon = Icons.Default.Book,
-                    isDarkMode = isDarkMode,
-                    surfaceColor = if (isDarkMode) darkModeSurface else lightModeSurface
-                )
+            ) { page ->
+                when (page) {
+                    0 -> {
+                        // Home Content Page
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(16.dp)
+                                .verticalScroll(rememberScrollState()),
+                            verticalArrangement = Arrangement.spacedBy(20.dp)
+                        ) {
+                            InfoCard(
+                                title = "Verse of the Day",
+                                content = data.verseOfTheDay,
+                                icon = Icons.Default.Book,
+                                isDarkMode = isDarkMode,
+                                surfaceColor = if (isDarkMode) darkModeSurface else lightModeSurface
+                            )
 
-                InfoCard(
-                    title = "Announcements",
-                    content = data.announcement,
-                    icon = Icons.Default.Campaign,
-                    isDarkMode = isDarkMode,
-                    surfaceColor = if (isDarkMode) darkModeSurface else lightModeSurface
-                )
+                            InfoCard(
+                                title = "Announcements",
+                                content = data.announcement,
+                                icon = Icons.Default.Campaign,
+                                isDarkMode = isDarkMode,
+                                surfaceColor = if (isDarkMode) darkModeSurface else lightModeSurface
+                            )
+
+                            // Swipe Hint
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 16.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "← Swipe left for DVBS →",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (isDarkMode) Color.White.copy(alpha = 0.5f) 
+                                           else Color.Black.copy(alpha = 0.5f)
+                                )
+                            }
+                        }
+                    }
+                    1 -> {
+                        // DVBS Content Page
+                        DVBSScreen(
+                            dvbsViewModel = dvbsViewModel,
+                            isDarkMode = isDarkMode
+                        )
+                    }
+                }
             }
         }
     }
@@ -303,7 +342,7 @@ private fun HomeTopAppBar(
                             )
                         }
                     )
-                    Divider()
+                    HorizontalDivider()
                     DropdownMenuItem(
                         text = { Text("Logout") },
                         onClick = {
@@ -376,7 +415,7 @@ private fun AppDrawerContent(
         ) {
             DrawerButton(
                 text = "Add New Entry",
-                icon = Icons.Default.NoteAdd,
+                icon = Icons.AutoMirrored.Filled.NoteAdd,
                 onClick = onEntryClick
             )
 
