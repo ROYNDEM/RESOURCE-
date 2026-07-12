@@ -106,7 +106,9 @@ fun HomeScreen(
     isDarkMode: Boolean,
     onThemeToggle: () -> Unit,
     onNavigateToPending: () -> Unit,
-    onNavigateToEntry: () -> Unit
+    onNavigateToEntry: () -> Unit,
+    onNavigateToDVBSResourceEntry: () -> Unit = {},
+    onNavigateToDVBSRegistrationEntry: () -> Unit = {}
 ) {
     val primaryColor = Color(0xFFC62828)
     val lightModeBackground = Color(0xFFF0F0F0)
@@ -149,6 +151,10 @@ fun HomeScreen(
             )
         }
     ) {
+        val data by appDataViewModel.generalData.collectAsState()
+        val pagerState = rememberPagerState(pageCount = { 2 })
+        val dvbsViewModel: DVBSViewModel = viewModel()
+
         Scaffold(
             topBar = {
                 HomeTopAppBar(
@@ -161,23 +167,22 @@ fun HomeScreen(
                 )
             },
             floatingActionButton = {
-                FloatingActionButton(
-                    onClick = { navController.navigate(AppDestinations.RESOURCE_ENTRY_ROUTE) },
-                    containerColor = primaryColor
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = "Add resource entry",
-                        tint = Color.White
-                    )
+                // Only show FAB on page 0 (Home)
+                if (pagerState.currentPage == 0) {
+                    FloatingActionButton(
+                        onClick = { navController.navigate(AppDestinations.RESOURCE_ENTRY_ROUTE) },
+                        containerColor = primaryColor
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = "Add resource entry",
+                            tint = Color.White
+                        )
+                    }
                 }
             },
             containerColor = if (isDarkMode) darkModeBackground else lightModeBackground
         ) { paddingValues ->
-            val data by appDataViewModel.generalData.collectAsState()
-            val pagerState = rememberPagerState(pageCount = { 2 })
-            val dvbsViewModel: DVBSViewModel = viewModel()
-
             HorizontalPager(
                 state = pagerState,
                 modifier = Modifier
@@ -230,7 +235,9 @@ fun HomeScreen(
                         // DVBS Content Page
                         DVBSScreen(
                             dvbsViewModel = dvbsViewModel,
-                            isDarkMode = isDarkMode
+                            isDarkMode = isDarkMode,
+                            onNavigateToResourceEntry = onNavigateToDVBSResourceEntry,
+                            onNavigateToRegistrationEntry = onNavigateToDVBSRegistrationEntry
                         )
                     }
                 }

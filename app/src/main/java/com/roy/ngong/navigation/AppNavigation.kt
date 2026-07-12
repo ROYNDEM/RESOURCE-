@@ -10,6 +10,7 @@ object AppDestinations {
     const val ADD_EDIT_EVENT_ROUTE = "add_edit_event/{dateString}"
     const val RESOURCE_ENTRY_ROUTE = "resource_entry"
     const val RESOURCE_EDIT_ROUTE = "resource_edit"
+    const val DVBS_REGISTRATION_ENTRY_ROUTE = "dvbs_registration_entry"
     const val ADMIN_DASHBOARD_ROUTE = "admin_dashboard" // For the main admin area after login
     const val ADMIN_MANAGE_CONTROLS_ROUTE = "admin_manage_controls"
     const val ADMIN_REPORTS_LIST_ROUTE = "admin_reports_list"

@@ -30,3 +30,19 @@ data class DVBSStatistics(
     val lastEventDate: String = ""
 )
 
+@Entity(tableName = "dvbs_registrations")
+data class DVBSRegistration(
+    @PrimaryKey
+    val id: String = "",
+    val childName: String = "",
+    val age: Int = 0,
+    val gradeClass: String = "",
+    val parentGuardianName: String = "",
+    val parentGuardianPhone: String = "",
+    val registrationDate: String = "",
+    val registeredBy: String = "",
+    @ServerTimestamp
+    val createdAt: Date? = null,
+    val lastModified: Date? = null
+)
+

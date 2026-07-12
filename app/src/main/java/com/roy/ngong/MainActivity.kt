@@ -155,6 +155,8 @@ fun AppNavigator(
                 onProfileClick = { navController.navigate(AppDestinations.PROFILE_ROUTE) },
                 onNavigateToPending = { navController.navigate(AppDestinations.RESOURCE_EDIT_ROUTE) },
                 onNavigateToEntry = { navController.navigate(AppDestinations.RESOURCE_ENTRY_ROUTE) },
+                onNavigateToDVBSResourceEntry = { navController.navigate(AppDestinations.RESOURCE_ENTRY_ROUTE) },
+                onNavigateToDVBSRegistrationEntry = { navController.navigate(AppDestinations.DVBS_REGISTRATION_ENTRY_ROUTE) },
                 isDarkMode = isDarkMode,
                 onThemeToggle = onThemeToggle
             )
@@ -170,6 +172,15 @@ fun AppNavigator(
                 pendingViewModel = pendingViewModel,
                 snackbarHostState = snackbarHostState,
                 onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(AppDestinations.DVBS_REGISTRATION_ENTRY_ROUTE) {
+            val dvbsViewModel: com.roy.ngong.ui.dvbs.DVBSViewModel = viewModel()
+            com.roy.ngong.ui.dvbs.DVBSRegistrationEntryScreen(
+                dvbsViewModel = dvbsViewModel,
+                onNavigateBack = { navController.popBackStack() },
+                isDarkMode = isDarkMode
             )
         }
 

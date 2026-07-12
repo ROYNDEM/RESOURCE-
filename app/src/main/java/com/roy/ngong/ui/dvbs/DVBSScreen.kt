@@ -7,10 +7,15 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -18,14 +23,19 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.roy.ngong.data.DVBSRecord
+import com.roy.ngong.data.DVBSRegistration
 import java.util.Locale
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DVBSScreen(
     dvbsViewModel: DVBSViewModel = viewModel(),
-    isDarkMode: Boolean = false
+    isDarkMode: Boolean = false,
+    onNavigateToResourceEntry: () -> Unit = {},
+    onNavigateToRegistrationEntry: () -> Unit = {}
 ) {
     val records by dvbsViewModel.dvbsRecords.collectAsState()
+    val registrations by dvbsViewModel.dvbsRegistrations.collectAsState()
     val statistics by dvbsViewModel.dvbsStatistics.collectAsState()
 
     val primaryColor = Color(0xFFC62828)
@@ -33,48 +43,122 @@ fun DVBSScreen(
     val darkModeBackground = Color.Black
     val contentColor = if (isDarkMode) Color.White else Color.Black
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(if (isDarkMode) darkModeBackground else lightModeBackground)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        Text(
-            text = "DVBS Data",
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold,
-            color = contentColor,
-            modifier = Modifier.padding(bottom = 8.dp)
-        )
+    var selectedTab by remember { mutableIntStateOf(1) }  // Default to Registrations tab
 
-        if (statistics.totalEvents > 0) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+    Scaffold(
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = {
+                    if (selectedTab == 0) {
+                        onNavigateToResourceEntry()
+                    } else {
+                        onNavigateToRegistrationEntry()
+                    }
+                },
+                containerColor = primaryColor,
+                contentColor = Color.White
             ) {
-                StatCard("Events", statistics.totalEvents.toString(), primaryColor)
-                StatCard("Attendees", statistics.totalAttendees.toString(), Color(0xFF1976D2))
-                StatCard("Avg Attend", String.format(Locale.getDefault(), "%.1f", statistics.averageAttendance), Color(0xFF388E3C))
+                Icon(Icons.Default.Add, contentDescription = "Add Entry")
             }
         }
-
-        Text(
-            text = "Records (${records.size})",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = contentColor,
-            modifier = Modifier.padding(top = 8.dp)
-        )
-
-        LazyColumn(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(if (isDarkMode) darkModeBackground else lightModeBackground)
+                .padding(paddingValues)
         ) {
-            items(records) { record ->
-                DVBSRecordItem(record, contentColor)
+            TabRow(
+                selectedTabIndex = selectedTab,
+                modifier = Modifier.fillMaxWidth(),
+                containerColor = primaryColor,
+                contentColor = Color.White
+            ) {
+                Tab(
+                    selected = selectedTab == 0,
+                    onClick = { selectedTab = 0 },
+                    text = { Text("DVBS Events") }
+                )
+                Tab(
+                    selected = selectedTab == 1,
+                    onClick = { selectedTab = 1 },
+                    text = { Text("Registrations") }
+                )
+            }
+
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                when (selectedTab) {
+                    0 -> {
+                        Text(
+                            text = "DVBS Events",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = contentColor,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+
+                        if (statistics.totalEvents > 0) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                StatCard("Events", statistics.totalEvents.toString(), primaryColor)
+                                StatCard("Attendees", statistics.totalAttendees.toString(), Color(0xFF1976D2))
+                                StatCard("Avg Attend", String.format(Locale.getDefault(), "%.1f", statistics.averageAttendance), Color(0xFF388E3C))
+                            }
+                        }
+
+                        Text(
+                            text = "Records (${records.size})",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = contentColor,
+                            modifier = Modifier.padding(top = 8.dp)
+                        )
+
+                        LazyColumn(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            items(records) { record ->
+                                DVBSRecordItem(record, contentColor)
+                            }
+                        }
+                    }
+                    1 -> {
+                        Text(
+                            text = "Child Registrations",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = contentColor,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+
+                        Text(
+                            text = "Total Registrations: ${registrations.size}",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = contentColor,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+
+                        LazyColumn(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            items(registrations) { registration ->
+                                DVBSRegistrationItem(registration, contentColor)
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -107,3 +191,17 @@ private fun DVBSRecordItem(record: DVBSRecord, contentColor: Color) {
     }
 }
 
+@Composable
+private fun DVBSRegistrationItem(registration: DVBSRegistration, contentColor: Color) {
+    Card(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(registration.childName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = contentColor)
+            Text("Age: ${registration.age}", style = MaterialTheme.typography.bodyMedium, color = contentColor)
+            Text("Grade/Class: ${registration.gradeClass}", style = MaterialTheme.typography.bodyMedium, color = contentColor)
+            Text("Parent/Guardian: ${registration.parentGuardianName}", style = MaterialTheme.typography.bodyMedium, color = contentColor)
+            Text("Phone: ${registration.parentGuardianPhone}", style = MaterialTheme.typography.bodyMedium, color = contentColor)
+            Text("Date: ${registration.registrationDate}", style = MaterialTheme.typography.labelSmall, color = contentColor.copy(alpha = 0.6f))
+        }
+    }
+}
