@@ -33,13 +33,18 @@ import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.Book
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Event
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.automirrored.filled.NoteAdd
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -131,6 +136,26 @@ fun HomeScreen(
                     checkAdminStatus { isAdmin ->
                         if (isAdmin) {
                             navController.navigate("admin_flow")
+                        } else {
+                            Toast.makeText(context, "Access Denied: Admin role required.", Toast.LENGTH_LONG).show()
+                        }
+                    }
+                },
+                onDVBSRegistrationsClick = {
+                    scope.launch { drawerState.close() }
+                    checkAdminStatus { isAdmin ->
+                        if (isAdmin) {
+                            navController.navigate(AppDestinations.DVBS_ADMIN_REGISTRATIONS_ROUTE)
+                        } else {
+                            Toast.makeText(context, "Access Denied: Admin role required.", Toast.LENGTH_LONG).show()
+                        }
+                    }
+                },
+                onDVBSResourcesClick = {
+                    scope.launch { drawerState.close() }
+                    checkAdminStatus { isAdmin ->
+                        if (isAdmin) {
+                            navController.navigate(AppDestinations.DVBS_ADMIN_RESOURCES_ROUTE)
                         } else {
                             Toast.makeText(context, "Access Denied: Admin role required.", Toast.LENGTH_LONG).show()
                         }
@@ -374,7 +399,9 @@ private fun AppDrawerContent(
     onAdminClick: () -> Unit,
     onEntryClick: () -> Unit,
     onPendingClick: () -> Unit,
-    onCalendarClick: () -> Unit
+    onCalendarClick: () -> Unit,
+    onDVBSRegistrationsClick: () -> Unit = {},
+    onDVBSResourcesClick: () -> Unit = {}
 ) {
     ModalDrawerSheet(
         drawerContainerColor = Color(0xFFF0F0F0)
@@ -427,7 +454,7 @@ private fun AppDrawerContent(
             )
 
             DrawerButton(
-                text = "Event Calendar", // <-- RE-ADDED THE BUTTON
+                text = "Event Calendar",
                 icon = Icons.Default.CalendarMonth,
                 onClick = onCalendarClick
             )
@@ -440,11 +467,131 @@ private fun AppDrawerContent(
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
+            // DVBS Admin Menu (Collapsible)
+            DVBSCollapsibleMenu(
+                onDVBSRegistrationsClick = onDVBSRegistrationsClick,
+                onDVBSResourcesClick = onDVBSResourcesClick
+            )
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
             DrawerButton(
                 text = "Admin Dashboard",
                 icon = Icons.Default.AdminPanelSettings,
                 onClick = onAdminClick
             )
+        }
+    }
+}
+
+/**
+ * DVBS Collapsible Menu for Admin Users
+ */
+@Composable
+private fun DVBSCollapsibleMenu(
+    onDVBSRegistrationsClick: () -> Unit,
+    onDVBSResourcesClick: () -> Unit
+) {
+    var isExpanded by remember { mutableStateOf(false) }
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        // Main DVBS Button (Collapsible Toggle)
+        Button(
+            onClick = { isExpanded = !isExpanded },
+            shape = RoundedCornerShape(16.dp),
+            elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp, pressedElevation = 2.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Color.White,
+                contentColor = Color.Black
+            ),
+            modifier = Modifier.fillMaxWidth(),
+            contentPadding = PaddingValues(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Start
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Event,
+                    contentDescription = "DVBS"
+                )
+                Spacer(modifier = Modifier.width(16.dp))
+                Text("DVBS", style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium))
+                Spacer(modifier = Modifier.weight(1f))
+                Icon(
+                    imageVector = if (isExpanded) 
+                        Icons.Default.ExpandLess 
+                    else 
+                        Icons.Default.ExpandMore,
+                    contentDescription = "Toggle"
+                )
+            }
+        }
+
+        // Sub-items (shown when expanded)
+        if (isExpanded) {
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Registrations Sub-item
+            Button(
+                onClick = onDVBSRegistrationsClick,
+                shape = RoundedCornerShape(12.dp),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp, pressedElevation = 1.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFFF5F5F5),
+                    contentColor = Color.Black
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 16.dp),
+                contentPadding = PaddingValues(12.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Start
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Person,
+                        contentDescription = "Registrations",
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text("Registrations", style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            // Resources Sub-item
+            Button(
+                onClick = onDVBSResourcesClick,
+                shape = RoundedCornerShape(12.dp),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp, pressedElevation = 1.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFFF5F5F5),
+                    contentColor = Color.Black
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 16.dp),
+                contentPadding = PaddingValues(12.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Start
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Build,
+                        contentDescription = "Resources",
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text("Resources", style = MaterialTheme.typography.bodyMedium)
+                }
+            }
         }
     }
 }

@@ -20,6 +20,16 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.*
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
@@ -103,6 +113,7 @@ class MainActivity : ComponentActivity() {
 }
 
 
+@OptIn(ExperimentalMaterial3Api::class)
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun AppNavigator(
@@ -155,7 +166,7 @@ fun AppNavigator(
                 onProfileClick = { navController.navigate(AppDestinations.PROFILE_ROUTE) },
                 onNavigateToPending = { navController.navigate(AppDestinations.RESOURCE_EDIT_ROUTE) },
                 onNavigateToEntry = { navController.navigate(AppDestinations.RESOURCE_ENTRY_ROUTE) },
-                onNavigateToDVBSResourceEntry = { navController.navigate(AppDestinations.RESOURCE_ENTRY_ROUTE) },
+                onNavigateToDVBSResourceEntry = { navController.navigate(AppDestinations.DVBS_RESOURCE_ENTRY_ROUTE) },
                 onNavigateToDVBSRegistrationEntry = { navController.navigate(AppDestinations.DVBS_REGISTRATION_ENTRY_ROUTE) },
                 isDarkMode = isDarkMode,
                 onThemeToggle = onThemeToggle
@@ -175,6 +186,15 @@ fun AppNavigator(
             )
         }
 
+        composable(AppDestinations.DVBS_RESOURCE_ENTRY_ROUTE) {
+            val dvbsViewModel: com.roy.ngong.ui.dvbs.DVBSViewModel = viewModel()
+            com.roy.ngong.ui.dvbs.DVBSEntryScreen(
+                dvbsViewModel = dvbsViewModel,
+                onNavigateBack = { navController.popBackStack() },
+                isDarkMode = isDarkMode
+            )
+        }
+
         composable(AppDestinations.DVBS_REGISTRATION_ENTRY_ROUTE) {
             val dvbsViewModel: com.roy.ngong.ui.dvbs.DVBSViewModel = viewModel()
             com.roy.ngong.ui.dvbs.DVBSRegistrationEntryScreen(
@@ -182,6 +202,90 @@ fun AppNavigator(
                 onNavigateBack = { navController.popBackStack() },
                 isDarkMode = isDarkMode
             )
+        }
+
+        composable(AppDestinations.DVBS_ADMIN_RESOURCES_ROUTE) {
+            val dvbsViewModel: com.roy.ngong.ui.dvbs.DVBSViewModel = viewModel()
+            val primaryColor = Color(0xFFC62828)
+            
+            Scaffold(
+                topBar = {
+                    CenterAlignedTopAppBar(
+                        title = {
+                            Image(
+                                painter = painterResource(id = R.drawable.citam_logo),
+                                contentDescription = "Logo",
+                                modifier = Modifier.size(60.dp),
+                                colorFilter = ColorFilter.tint(Color.White)
+                            )
+                        },
+                        navigationIcon = {
+                            IconButton(onClick = { navController.popBackStack() }) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = "Back",
+                                    tint = Color.White
+                                )
+                            }
+                        },
+                        colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                            containerColor = primaryColor
+                        )
+                    )
+                }
+            ) { padding ->
+                Box(modifier = Modifier.padding(padding)) {
+                    com.roy.ngong.ui.dvbs.DVBSScreen(
+                        dvbsViewModel = dvbsViewModel,
+                        isDarkMode = isDarkMode,
+                        mode = com.roy.ngong.ui.dvbs.DVBSViewMode.RESOURCES,
+                        onNavigateToResourceEntry = { navController.navigate(AppDestinations.DVBS_RESOURCE_ENTRY_ROUTE) },
+                        onNavigateToRegistrationEntry = { navController.navigate(AppDestinations.DVBS_REGISTRATION_ENTRY_ROUTE) }
+                    )
+                }
+            }
+        }
+
+        composable(AppDestinations.DVBS_ADMIN_REGISTRATIONS_ROUTE) {
+            val dvbsViewModel: com.roy.ngong.ui.dvbs.DVBSViewModel = viewModel()
+            val primaryColor = Color(0xFFC62828)
+
+            Scaffold(
+                topBar = {
+                    CenterAlignedTopAppBar(
+                        title = {
+                            Image(
+                                painter = painterResource(id = R.drawable.citam_logo),
+                                contentDescription = "Logo",
+                                modifier = Modifier.size(60.dp),
+                                colorFilter = ColorFilter.tint(Color.White)
+                            )
+                        },
+                        navigationIcon = {
+                            IconButton(onClick = { navController.popBackStack() }) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = "Back",
+                                    tint = Color.White
+                                )
+                            }
+                        },
+                        colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                            containerColor = primaryColor
+                        )
+                    )
+                }
+            ) { padding ->
+                Box(modifier = Modifier.padding(padding)) {
+                    com.roy.ngong.ui.dvbs.DVBSScreen(
+                        dvbsViewModel = dvbsViewModel,
+                        isDarkMode = isDarkMode,
+                        mode = com.roy.ngong.ui.dvbs.DVBSViewMode.REGISTRATIONS,
+                        onNavigateToResourceEntry = { navController.navigate(AppDestinations.DVBS_RESOURCE_ENTRY_ROUTE) },
+                        onNavigateToRegistrationEntry = { navController.navigate(AppDestinations.DVBS_REGISTRATION_ENTRY_ROUTE) }
+                    )
+                }
+            }
         }
 
         composable(route = AppDestinations.RESOURCE_EDIT_ROUTE) {

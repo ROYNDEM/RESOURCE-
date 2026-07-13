@@ -22,6 +22,23 @@ data class DVBSRecord(
     val lastModified: Date? = null
 )
 
+@Entity(tableName = "dvbs_resources")
+data class DVBSResource(
+    @PrimaryKey
+    val id: String = "",
+    val date: String = "",
+    val dvbsDay: String = "",
+    val grade: String = "",
+    val teacherName: String = "",
+    val numChildren: Int = 0,
+    val numNewSalvations: Int = 0,
+    val numWorkers: Int = 0,
+    val recordedBy: String = "",
+    @ServerTimestamp
+    val createdAt: Date? = null,
+    val lastModified: Date? = null
+)
+
 // For displaying DVBS statistics
 data class DVBSStatistics(
     val totalEvents: Int = 0,
@@ -39,6 +56,8 @@ data class DVBSRegistration(
     val gradeClass: String = "",
     val parentGuardianName: String = "",
     val parentGuardianPhone: String = "",
+    val eventDate: String = "",
+    val dvbsDay: String = "",
     val registrationDate: String = "",
     val registeredBy: String = "",
     @ServerTimestamp

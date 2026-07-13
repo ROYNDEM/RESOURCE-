@@ -1,193 +1,139 @@
 package com.roy.ngong.ui.dvbs
 
+import androidx.compose.animation.*
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.ListAlt
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.roy.ngong.data.DVBSRecord
 import com.roy.ngong.data.DVBSRegistration
-import java.util.Locale
+import com.roy.ngong.data.DVBSResource
 
-@OptIn(ExperimentalMaterial3Api::class)
+enum class DVBSViewMode {
+    RESOURCES, REGISTRATIONS
+}
+
 @Composable
 fun DVBSScreen(
     dvbsViewModel: DVBSViewModel = viewModel(),
     isDarkMode: Boolean = false,
+    mode: DVBSViewMode = DVBSViewMode.REGISTRATIONS,
     onNavigateToResourceEntry: () -> Unit = {},
     onNavigateToRegistrationEntry: () -> Unit = {}
 ) {
-    val records by dvbsViewModel.dvbsRecords.collectAsState()
     val registrations by dvbsViewModel.dvbsRegistrations.collectAsState()
-    val statistics by dvbsViewModel.dvbsStatistics.collectAsState()
+    val resources by dvbsViewModel.dvbsResources.collectAsState()
 
     val primaryColor = Color(0xFFC62828)
     val lightModeBackground = Color(0xFFF0F0F0)
     val darkModeBackground = Color.Black
     val contentColor = if (isDarkMode) Color.White else Color.Black
 
-    var selectedTab by remember { mutableIntStateOf(1) }  // Default to Registrations tab
+    var fabExpanded by remember { mutableStateOf(false) }
 
-    Scaffold(
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = {
-                    if (selectedTab == 0) {
-                        onNavigateToResourceEntry()
-                    } else {
-                        onNavigateToRegistrationEntry()
-                    }
-                },
-                containerColor = primaryColor,
-                contentColor = Color.White
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "Add Entry")
-            }
-        }
-    ) { paddingValues ->
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(if (isDarkMode) darkModeBackground else lightModeBackground)
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(if (isDarkMode) darkModeBackground else lightModeBackground)
-                .padding(paddingValues)
+                .padding(16.dp)
         ) {
-            TabRow(
-                selectedTabIndex = selectedTab,
-                modifier = Modifier.fillMaxWidth(),
-                containerColor = primaryColor,
-                contentColor = Color.White
-            ) {
-                Tab(
-                    selected = selectedTab == 0,
-                    onClick = { selectedTab = 0 },
-                    text = { Text("DVBS Events") }
-                )
-                Tab(
-                    selected = selectedTab == 1,
-                    onClick = { selectedTab = 1 },
-                    text = { Text("Registrations") }
-                )
-            }
+            val titleText = if (mode == DVBSViewMode.REGISTRATIONS) 
+                "Child Registrations (${registrations.size})" 
+            else 
+                "Resource Entries (${resources.size})"
 
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                when (selectedTab) {
-                    0 -> {
-                        Text(
-                            text = "DVBS Events",
-                            style = MaterialTheme.typography.headlineSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = contentColor,
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        )
+            Text(
+                text = titleText,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                color = contentColor,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
 
-                        if (statistics.totalEvents > 0) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .horizontalScroll(rememberScrollState()),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                StatCard("Events", statistics.totalEvents.toString(), primaryColor)
-                                StatCard("Attendees", statistics.totalAttendees.toString(), Color(0xFF1976D2))
-                                StatCard("Avg Attend", String.format(Locale.getDefault(), "%.1f", statistics.averageAttendance), Color(0xFF388E3C))
-                            }
-                        }
-
-                        Text(
-                            text = "Records (${records.size})",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = contentColor,
-                            modifier = Modifier.padding(top = 8.dp)
-                        )
-
-                        LazyColumn(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            items(records) { record ->
-                                DVBSRecordItem(record, contentColor)
-                            }
+            if (mode == DVBSViewMode.REGISTRATIONS) {
+                if (registrations.isEmpty()) {
+                    EmptyListPlaceholder("No registrations yet.", contentColor)
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        contentPadding = PaddingValues(bottom = 80.dp) // Space for FAB
+                    ) {
+                        items(registrations) { registration ->
+                            DVBSRegistrationItem(registration, contentColor)
                         }
                     }
-                    1 -> {
-                        Text(
-                            text = "Child Registrations",
-                            style = MaterialTheme.typography.headlineSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = contentColor,
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        )
-
-                        Text(
-                            text = "Total Registrations: ${registrations.size}",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = contentColor,
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        )
-
-                        LazyColumn(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            items(registrations) { registration ->
-                                DVBSRegistrationItem(registration, contentColor)
-                            }
+                }
+            } else {
+                if (resources.isEmpty()) {
+                    EmptyListPlaceholder("No resource entries yet.", contentColor)
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        contentPadding = PaddingValues(bottom = 80.dp) // Space for FAB
+                    ) {
+                        items(resources) { resource ->
+                            DVBSResourceItem(resource, contentColor)
                         }
                     }
                 }
             }
         }
-    }
-}
 
-@Composable
-private fun StatCard(title: String, value: String, color: Color) {
-    Card(shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = color),
-        modifier = Modifier.size(120.dp, 100.dp)) {
-        Column(modifier = Modifier.fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(value, fontWeight = FontWeight.Bold, color = Color.White)
-            Text(title, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.8f))
+        // Floating Action Button moved inside the Box for uniformity
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(16.dp)
+        ) {
+            MultiFloatingActionButton(
+                expanded = fabExpanded,
+                onExpandedChange = { fabExpanded = it },
+                primaryColor = primaryColor,
+                onAddRegistration = onNavigateToRegistrationEntry,
+                onAddResource = onNavigateToResourceEntry
+            )
         }
     }
 }
 
 @Composable
-private fun DVBSRecordItem(record: DVBSRecord, contentColor: Color) {
-    Card(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(record.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = contentColor)
-            if (record.topic.isNotEmpty()) Text("Topic: ${record.topic}", style = MaterialTheme.typography.bodyMedium, color = contentColor)
-            if (record.location.isNotEmpty()) Text("Location: ${record.location}", style = MaterialTheme.typography.bodyMedium, color = contentColor)
-            Text("Attendees: ${record.attendeeCount}", style = MaterialTheme.typography.bodyMedium, color = contentColor)
-            if (record.notes.isNotEmpty()) Text(record.notes, style = MaterialTheme.typography.bodySmall, color = contentColor.copy(alpha = 0.8f))
-            Text("Date: ${record.date}", style = MaterialTheme.typography.labelSmall, color = contentColor.copy(alpha = 0.6f))
-        }
+fun EmptyListPlaceholder(message: String, contentColor: Color) {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            message,
+            style = MaterialTheme.typography.bodyMedium,
+            color = contentColor.copy(alpha = 0.6f),
+            textAlign = TextAlign.Center
+        )
     }
 }
 
@@ -202,6 +148,123 @@ private fun DVBSRegistrationItem(registration: DVBSRegistration, contentColor: C
             Text("Parent/Guardian: ${registration.parentGuardianName}", style = MaterialTheme.typography.bodyMedium, color = contentColor)
             Text("Phone: ${registration.parentGuardianPhone}", style = MaterialTheme.typography.bodyMedium, color = contentColor)
             Text("Date: ${registration.registrationDate}", style = MaterialTheme.typography.labelSmall, color = contentColor.copy(alpha = 0.6f))
+        }
+    }
+}
+
+@Composable
+private fun DVBSResourceItem(resource: DVBSResource, contentColor: Color) {
+    Card(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(resource.dvbsDay, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = contentColor)
+                Text(resource.date, style = MaterialTheme.typography.labelSmall, color = contentColor.copy(alpha = 0.6f))
+            }
+            Text("Grade: ${resource.grade}", fontWeight = FontWeight.Medium)
+            Text("Teacher: ${resource.teacherName}")
+            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                StatItem("Children", resource.numChildren.toString())
+                StatItem("Salvations", resource.numNewSalvations.toString())
+                StatItem("Workers", resource.numWorkers.toString())
+            }
+        }
+    }
+}
+
+@Composable
+fun StatItem(label: String, value: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(value, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyLarge)
+        Text(label, style = MaterialTheme.typography.labelSmall)
+    }
+}
+
+@Composable
+fun MultiFloatingActionButton(
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
+    primaryColor: Color,
+    onAddRegistration: () -> Unit,
+    onAddResource: () -> Unit
+) {
+    val rotation by animateFloatAsState(if (expanded) 45f else 0f)
+
+    Column(horizontalAlignment = Alignment.End) {
+        AnimatedVisibility(
+            visible = expanded,
+            enter = fadeIn() + expandVertically(),
+            exit = fadeOut() + shrinkVertically()
+        ) {
+            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                FabOption(
+                    icon = Icons.Default.Group,
+                    label = "Add Registration",
+                    onClick = {
+                        onExpandedChange(false)
+                        onAddRegistration()
+                    },
+                    primaryColor = primaryColor
+                )
+                FabOption(
+                    icon = Icons.Default.ListAlt,
+                    label = "Add Resource",
+                    onClick = {
+                        onExpandedChange(false)
+                        onAddResource()
+                    },
+                    primaryColor = primaryColor
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(16.dp))
+        FloatingActionButton(
+            onClick = { onExpandedChange(!expanded) },
+            containerColor = primaryColor,
+            contentColor = Color.White,
+            shape = CircleShape
+        ) {
+            Icon(
+                if (expanded) Icons.Default.Close else Icons.Default.Add,
+                contentDescription = "Menu",
+                modifier = Modifier.rotate(rotation)
+            )
+        }
+    }
+}
+
+@Composable
+fun FabOption(
+    icon: ImageVector,
+    label: String,
+    onClick: () -> Unit,
+    primaryColor: Color
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier.clickable { onClick() }
+    ) {
+        Surface(
+            shape = RoundedCornerShape(8.dp),
+            color = Color.Black.copy(alpha = 0.6f),
+            contentColor = Color.White
+        ) {
+            Text(
+                text = label,
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                fontSize = 14.sp
+            )
+        }
+        FloatingActionButton(
+            onClick = onClick,
+            containerColor = primaryColor,
+            contentColor = Color.White,
+            modifier = Modifier.size(48.dp),
+            shape = CircleShape
+        ) {
+            Icon(icon, contentDescription = label)
         }
     }
 }
