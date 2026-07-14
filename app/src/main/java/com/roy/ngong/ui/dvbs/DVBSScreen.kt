@@ -14,6 +14,10 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.ListAlt
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -51,12 +55,33 @@ fun DVBSScreen(
     val contentColor = if (isDarkMode) Color.White else Color.Black
 
     var fabExpanded by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
 
     // Determine the view mode if not explicitly set (for the swipeable page)
     val effectiveMode = when {
         userRole == "registration" -> DVBSViewMode.REGISTRATIONS
         userRole == "resource" -> DVBSViewMode.RESOURCES
         else -> mode // Admin sees whatever mode is passed (default registrations)
+    }
+
+    // --- FILTERING LOGIC ---
+    val filteredRegistrations = remember(registrations, searchQuery) {
+        if (searchQuery.isBlank()) registrations
+        else registrations.filter {
+            it.childName.contains(searchQuery, ignoreCase = true) ||
+            it.parentGuardianName.contains(searchQuery, ignoreCase = true) ||
+            it.gradeClass.contains(searchQuery, ignoreCase = true) ||
+            it.dvbsDay.contains(searchQuery, ignoreCase = true)
+        }
+    }
+
+    val filteredResources = remember(resources, searchQuery) {
+        if (searchQuery.isBlank()) resources
+        else resources.filter {
+            it.teacherName.contains(searchQuery, ignoreCase = true) ||
+            it.grade.contains(searchQuery, ignoreCase = true) ||
+            it.dvbsDay.contains(searchQuery, ignoreCase = true)
+        }
     }
 
     Box(
@@ -70,42 +95,94 @@ fun DVBSScreen(
                 .padding(16.dp)
         ) {
             val titleText = if (effectiveMode == DVBSViewMode.REGISTRATIONS) 
-                "Child Registrations (${registrations.size})" 
+                "Child Registrations" 
             else 
-                "Resource Entries (${resources.size})"
+                "Resource Entries"
 
-            Text(
-                text = titleText,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                color = contentColor,
-                modifier = Modifier.padding(bottom = 8.dp)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = titleText,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = contentColor,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // --- SEARCH BAR ---
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp),
+                placeholder = { Text("Search by name, grade, or day...") },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { searchQuery = "" }) {
+                            Icon(Icons.Default.Clear, contentDescription = "Clear search")
+                        }
+                    }
+                },
+                singleLine = true,
+                shape = RoundedCornerShape(12.dp),
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = if (isDarkMode) Color(0xFF2C2C2C) else Color.White,
+                    unfocusedContainerColor = if (isDarkMode) Color(0xFF2C2C2C) else Color.White,
+                    focusedIndicatorColor = primaryColor,
+                    cursorColor = primaryColor
+                )
             )
 
             if (effectiveMode == DVBSViewMode.REGISTRATIONS) {
-                if (registrations.isEmpty()) {
-                    EmptyListPlaceholder("No registrations yet.", contentColor)
+                if (filteredRegistrations.isEmpty()) {
+                    EmptyListPlaceholder(
+                        if (searchQuery.isEmpty()) "No registrations yet." else "No matches found for \"$searchQuery\"",
+                        contentColor
+                    )
                 } else {
+                    // Group filtered registrations by day
+                    val groupedRegistrations = filteredRegistrations.groupBy { it.dvbsDay }
+                        .toSortedMap(compareBy { it })
+
                     LazyColumn(
                         modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
                         contentPadding = PaddingValues(bottom = 80.dp)
                     ) {
-                        items(registrations) { registration ->
-                            DVBSRegistrationItem(registration, contentColor)
+                        groupedRegistrations.forEach { (day, dayRegistrations) ->
+                            item(key = day) {
+                                DVBSRegistrationDayGroup(
+                                    day = day,
+                                    registrations = dayRegistrations,
+                                    contentColor = contentColor,
+                                    isDarkMode = isDarkMode,
+                                    isSearchActive = searchQuery.isNotBlank()
+                                )
+                            }
                         }
                     }
                 }
             } else {
-                if (resources.isEmpty()) {
-                    EmptyListPlaceholder("No resource entries yet.", contentColor)
+                if (filteredResources.isEmpty()) {
+                    EmptyListPlaceholder(
+                        if (searchQuery.isEmpty()) "No resource entries yet." else "No matches found for \"$searchQuery\"",
+                        contentColor
+                    )
                 } else {
                     LazyColumn(
                         modifier = Modifier.fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                         contentPadding = PaddingValues(bottom = 80.dp)
                     ) {
-                        items(resources) { resource ->
+                        items(filteredResources) { resource ->
                             DVBSResourceItem(resource, contentColor)
                         }
                     }
@@ -126,7 +203,7 @@ fun DVBSScreen(
                         onExpandedChange = { fabExpanded = it },
                         primaryColor = primaryColor,
                         onAddRegistration = onNavigateToRegistrationEntry,
-                        onAddResource = onNavigateToResourceEntry
+                        onAddResource = onAddResourceEntry(userRole, effectiveMode, onNavigateToResourceEntry)
                     )
                 }
                 "registration" -> {
@@ -154,6 +231,116 @@ fun DVBSScreen(
     }
 }
 
+// Helper to determine resource entry navigation
+private fun onAddResourceEntry(userRole: String, mode: DVBSViewMode, onNav: () -> Unit): () -> Unit {
+    return onNav
+}
+
+@Composable
+fun DVBSRegistrationDayGroup(
+    day: String,
+    registrations: List<DVBSRegistration>,
+    contentColor: Color,
+    isDarkMode: Boolean,
+    isSearchActive: Boolean = false
+) {
+    // Automatically expand if a search is active to show results immediately
+    var isExpanded by remember(isSearchActive) { mutableStateOf(isSearchActive) }
+
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isDarkMode) Color(0xFF1E1E1E) else Color.White
+        )
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { isExpanded = !isExpanded },
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = day.ifBlank { "Unspecified Day" },
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = contentColor
+                    )
+                    Text(
+                        text = "Total: ${registrations.size} children",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = contentColor.copy(alpha = 0.7f)
+                    )
+                }
+                Icon(
+                    imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = if (isExpanded) "Collapse" else "Expand",
+                    tint = contentColor
+                )
+            }
+
+            AnimatedVisibility(visible = isExpanded) {
+                Column(
+                    modifier = Modifier.padding(top = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    HorizontalDivider(color = contentColor.copy(alpha = 0.1f))
+                    registrations.forEach { registration ->
+                        DVBSRegistrationDetailItem(registration, contentColor)
+                        if (registration != registrations.last()) {
+                            HorizontalDivider(
+                                modifier = Modifier.padding(horizontal = 8.dp),
+                                color = contentColor.copy(alpha = 0.05f)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DVBSRegistrationDetailItem(registration: DVBSRegistration, contentColor: Color) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = registration.childName,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = contentColor
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Text(
+                text = "Age: ${registration.age}",
+                style = MaterialTheme.typography.bodySmall,
+                color = contentColor.copy(alpha = 0.8f)
+            )
+            Text(
+                text = "Grade: ${registration.gradeClass}",
+                style = MaterialTheme.typography.bodySmall,
+                color = contentColor.copy(alpha = 0.8f)
+            )
+        }
+        Text(
+            text = "Guardian: ${registration.parentGuardianName} (${registration.parentGuardianPhone})",
+            style = MaterialTheme.typography.bodySmall,
+            color = contentColor.copy(alpha = 0.8f)
+        )
+        Text(
+            text = "Registered on: ${registration.registrationDate}",
+            style = MaterialTheme.typography.labelSmall,
+            color = contentColor.copy(alpha = 0.5f)
+        )
+    }
+}
+
 @Composable
 fun EmptyListPlaceholder(message: String, contentColor: Color) {
     Box(
@@ -166,21 +353,6 @@ fun EmptyListPlaceholder(message: String, contentColor: Color) {
             color = contentColor.copy(alpha = 0.6f),
             textAlign = TextAlign.Center
         )
-    }
-}
-
-@Composable
-private fun DVBSRegistrationItem(registration: DVBSRegistration, contentColor: Color) {
-    Card(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(registration.childName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = contentColor)
-            Text("Age: ${registration.age}", style = MaterialTheme.typography.bodyMedium, color = contentColor)
-            Text("Grade/Class: ${registration.gradeClass}", style = MaterialTheme.typography.bodyMedium, color = contentColor)
-            Text("Parent/Guardian: ${registration.parentGuardianName}", style = MaterialTheme.typography.bodyMedium, color = contentColor)
-            Text("Phone: ${registration.parentGuardianPhone}", style = MaterialTheme.typography.bodyMedium, color = contentColor)
-            Text("Date: ${registration.registrationDate}", style = MaterialTheme.typography.labelSmall, color = contentColor.copy(alpha = 0.6f))
-        }
     }
 }
 
