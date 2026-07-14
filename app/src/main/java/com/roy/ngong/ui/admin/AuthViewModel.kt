@@ -37,9 +37,12 @@ class AuthViewModel : ViewModel() {
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage = _errorMessage.asStateFlow()
 
-    // --- NEW: Holds the admin status of the current user ---
+    // --- UPDATED: Holds the user's role and admin status ---
     private val _isAdmin = MutableStateFlow(false)
     val isAdmin: StateFlow<Boolean> = _isAdmin.asStateFlow()
+
+    private val _userRole = MutableStateFlow("general") // "admin", "resource", "registration", "general"
+    val userRole: StateFlow<String> = _userRole.asStateFlow()
 
     // Exposes the currently logged-in user
     val currentUser get() = auth.currentUser
@@ -49,28 +52,32 @@ class AuthViewModel : ViewModel() {
         auth.addAuthStateListener { firebaseAuth ->
             val user = firebaseAuth.currentUser
             if (user != null) {
-                // User is signed in, check their admin status
-                checkAdminStatus(user.uid)
+                // User is signed in, fetch their profile data
+                fetchUserProfile(user.uid)
             } else {
-                // User is signed out, reset admin status
+                // User is signed out, reset data
                 _isAdmin.value = false
+                _userRole.value = "general"
             }
         }
     }
 
-    // --- NEW: Function to check isAdmin flag in Firestore ---
-    private fun checkAdminStatus(uid: String) {
+    // --- UPDATED: Function to fetch user data from Firestore ---
+    private fun fetchUserProfile(uid: String) {
         viewModelScope.launch {
             try {
                 val document = db.collection("users").document(uid).get().await()
                 if (document != null && document.exists()) {
                     _isAdmin.value = document.getBoolean("isAdmin") ?: false
+                    _userRole.value = document.getString("role") ?: "general"
                 } else {
-                    _isAdmin.value = false // Document doesn't exist
+                    _isAdmin.value = false
+                    _userRole.value = "general"
                 }
             } catch (e: Exception) {
-                Log.e("AuthViewModel", "Error checking admin status", e)
-                _isAdmin.value = false // Default to false on error
+                Log.e("AuthViewModel", "Error fetching user profile", e)
+                _isAdmin.value = false
+                _userRole.value = "general"
             }
         }
     }

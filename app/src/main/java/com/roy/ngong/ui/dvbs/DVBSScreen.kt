@@ -38,6 +38,7 @@ fun DVBSScreen(
     dvbsViewModel: DVBSViewModel = viewModel(),
     isDarkMode: Boolean = false,
     mode: DVBSViewMode = DVBSViewMode.REGISTRATIONS,
+    userRole: String = "general", // "admin", "resource", "registration", "general"
     onNavigateToResourceEntry: () -> Unit = {},
     onNavigateToRegistrationEntry: () -> Unit = {}
 ) {
@@ -51,6 +52,13 @@ fun DVBSScreen(
 
     var fabExpanded by remember { mutableStateOf(false) }
 
+    // Determine the view mode if not explicitly set (for the swipeable page)
+    val effectiveMode = when {
+        userRole == "registration" -> DVBSViewMode.REGISTRATIONS
+        userRole == "resource" -> DVBSViewMode.RESOURCES
+        else -> mode // Admin sees whatever mode is passed (default registrations)
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -61,7 +69,7 @@ fun DVBSScreen(
                 .fillMaxSize()
                 .padding(16.dp)
         ) {
-            val titleText = if (mode == DVBSViewMode.REGISTRATIONS) 
+            val titleText = if (effectiveMode == DVBSViewMode.REGISTRATIONS) 
                 "Child Registrations (${registrations.size})" 
             else 
                 "Resource Entries (${resources.size})"
@@ -74,14 +82,14 @@ fun DVBSScreen(
                 modifier = Modifier.padding(bottom = 8.dp)
             )
 
-            if (mode == DVBSViewMode.REGISTRATIONS) {
+            if (effectiveMode == DVBSViewMode.REGISTRATIONS) {
                 if (registrations.isEmpty()) {
                     EmptyListPlaceholder("No registrations yet.", contentColor)
                 } else {
                     LazyColumn(
                         modifier = Modifier.fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
-                        contentPadding = PaddingValues(bottom = 80.dp) // Space for FAB
+                        contentPadding = PaddingValues(bottom = 80.dp)
                     ) {
                         items(registrations) { registration ->
                             DVBSRegistrationItem(registration, contentColor)
@@ -95,7 +103,7 @@ fun DVBSScreen(
                     LazyColumn(
                         modifier = Modifier.fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
-                        contentPadding = PaddingValues(bottom = 80.dp) // Space for FAB
+                        contentPadding = PaddingValues(bottom = 80.dp)
                     ) {
                         items(resources) { resource ->
                             DVBSResourceItem(resource, contentColor)
@@ -105,19 +113,43 @@ fun DVBSScreen(
             }
         }
 
-        // Floating Action Button moved inside the Box for uniformity
+        // FAB logic based on role
         Box(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(16.dp)
         ) {
-            MultiFloatingActionButton(
-                expanded = fabExpanded,
-                onExpandedChange = { fabExpanded = it },
-                primaryColor = primaryColor,
-                onAddRegistration = onNavigateToRegistrationEntry,
-                onAddResource = onNavigateToResourceEntry
-            )
+            when (userRole) {
+                "admin" -> {
+                    MultiFloatingActionButton(
+                        expanded = fabExpanded,
+                        onExpandedChange = { fabExpanded = it },
+                        primaryColor = primaryColor,
+                        onAddRegistration = onNavigateToRegistrationEntry,
+                        onAddResource = onNavigateToResourceEntry
+                    )
+                }
+                "registration" -> {
+                    FloatingActionButton(
+                        onClick = onNavigateToRegistrationEntry,
+                        containerColor = primaryColor,
+                        contentColor = Color.White,
+                        shape = CircleShape
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = "Add Registration")
+                    }
+                }
+                "resource" -> {
+                    FloatingActionButton(
+                        onClick = onNavigateToResourceEntry,
+                        containerColor = primaryColor,
+                        contentColor = Color.White,
+                        shape = CircleShape
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = "Add Resource")
+                    }
+                }
+            }
         }
     }
 }

@@ -15,6 +15,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -131,6 +132,8 @@ fun AppNavigator(
     val authViewModel: AuthViewModel = viewModel()
     val pendingViewModel: PendingSubmissionsViewModel = viewModel()
     val calendarViewModel: CalendarViewModel = viewModel()
+    
+    val userRole by authViewModel.userRole.collectAsState()
 
     NavHost(
         navController = navController,
@@ -157,6 +160,7 @@ fun AppNavigator(
             HomeScreen(
                 navController = navController,
                 appDataViewModel = appDataViewModel,
+                authViewModel = authViewModel,
                 onLogout = {
                     authViewModel.logout()
                     navController.navigate(AppDestinations.LOGIN_ROUTE) {
@@ -238,6 +242,7 @@ fun AppNavigator(
                     com.roy.ngong.ui.dvbs.DVBSScreen(
                         dvbsViewModel = dvbsViewModel,
                         isDarkMode = isDarkMode,
+                        userRole = userRole,
                         mode = com.roy.ngong.ui.dvbs.DVBSViewMode.RESOURCES,
                         onNavigateToResourceEntry = { navController.navigate(AppDestinations.DVBS_RESOURCE_ENTRY_ROUTE) },
                         onNavigateToRegistrationEntry = { navController.navigate(AppDestinations.DVBS_REGISTRATION_ENTRY_ROUTE) }
@@ -280,6 +285,7 @@ fun AppNavigator(
                     com.roy.ngong.ui.dvbs.DVBSScreen(
                         dvbsViewModel = dvbsViewModel,
                         isDarkMode = isDarkMode,
+                        userRole = userRole,
                         mode = com.roy.ngong.ui.dvbs.DVBSViewMode.REGISTRATIONS,
                         onNavigateToResourceEntry = { navController.navigate(AppDestinations.DVBS_RESOURCE_ENTRY_ROUTE) },
                         onNavigateToRegistrationEntry = { navController.navigate(AppDestinations.DVBS_REGISTRATION_ENTRY_ROUTE) }
