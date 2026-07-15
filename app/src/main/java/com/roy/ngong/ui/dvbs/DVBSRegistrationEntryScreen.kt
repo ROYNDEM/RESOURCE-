@@ -7,6 +7,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -52,8 +53,17 @@ fun DVBSRegistrationEntryScreen(
     var dvbsDayError by rememberSaveable { mutableStateOf<String?>(null) }
 
     var gradeExpanded by remember { mutableStateOf(false) }
+    var nameSuggestionsExpanded by remember { mutableStateOf(false) }
 
     val registrations by dvbsViewModel.dvbsRegistrations.collectAsState()
+
+    val filteredSuggestions = remember(childName, registrations) {
+        if (childName.length < 2) emptyList()
+        else registrations
+            .filter { it.childName.contains(childName, ignoreCase = true) }
+            .distinctBy { it.childName.lowercase() }
+            .take(5)
+    }
 
     // Pre-populate if editing
     LaunchedEffect(registrationId, registrations) {
@@ -131,19 +141,70 @@ fun DVBSRegistrationEntryScreen(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            OutlinedTextField(
-                value = childName,
-                onValueChange = {
-                    childName = it
-                    childNameError = null
-                },
-                label = { Text("Child's Name") },
-                placeholder = { Text("e.g., John Doe") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                isError = childNameError != null,
-                shape = RoundedCornerShape(12.dp)
-            )
+            ExposedDropdownMenuBox(
+                expanded = nameSuggestionsExpanded && filteredSuggestions.isNotEmpty(),
+                onExpandedChange = { nameSuggestionsExpanded = it },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                OutlinedTextField(
+                    value = childName,
+                    onValueChange = {
+                        childName = it
+                        childNameError = null
+                        nameSuggestionsExpanded = true
+                    },
+                    label = { Text("Child's Name") },
+                    placeholder = { Text("e.g., John Doe") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .menuAnchor(),
+                    singleLine = true,
+                    isError = childNameError != null,
+                    shape = RoundedCornerShape(12.dp),
+                    trailingIcon = {
+                        if (childName.isNotEmpty()) {
+                            IconButton(onClick = {
+                                childName = ""
+                                ageString = ""
+                                gradeClass = ""
+                                parentGuardianName = ""
+                                parentGuardianPhone = ""
+                                selectedGender = "Boy"
+                            }) {
+                                Icon(Icons.Default.Clear, contentDescription = "Clear")
+                            }
+                        }
+                    }
+                )
+                ExposedDropdownMenu(
+                    expanded = nameSuggestionsExpanded && filteredSuggestions.isNotEmpty(),
+                    onDismissRequest = { nameSuggestionsExpanded = false }
+                ) {
+                    filteredSuggestions.forEach { suggestion ->
+                        DropdownMenuItem(
+                            text = {
+                                Column {
+                                    Text(suggestion.childName, fontWeight = FontWeight.Bold)
+                                    Text(
+                                        "Grade: ${suggestion.gradeClass}, Parent: ${suggestion.parentGuardianName}",
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                }
+                            },
+                            onClick = {
+                                childName = suggestion.childName
+                                ageString = suggestion.age.toString()
+                                gradeClass = suggestion.gradeClass
+                                parentGuardianName = suggestion.parentGuardianName
+                                parentGuardianPhone = suggestion.parentGuardianPhone
+                                selectedGender = suggestion.gender
+                                nameSuggestionsExpanded = false
+                            },
+                            contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding
+                        )
+                    }
+                }
+            }
             if (childNameError != null) {
                 Text(
                     text = childNameError!!,
