@@ -55,8 +55,8 @@ fun HomeScreen(
     onThemeToggle: () -> Unit,
     onNavigateToPending: () -> Unit,
     onNavigateToEntry: () -> Unit,
-    onNavigateToDVBSResourceEntry: () -> Unit = {},
-    onNavigateToDVBSRegistrationEntry: () -> Unit = {}
+    onNavigateToDVBSResourceEntry: (String?) -> Unit = {},
+    onNavigateToDVBSRegistrationEntry: (String?) -> Unit = {}
 ) {
     val primaryColor = Color(0xFFC62828)
     val lightModeBackground = Color(0xFFF0F0F0)

@@ -18,6 +18,8 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -43,8 +45,8 @@ fun DVBSScreen(
     isDarkMode: Boolean = false,
     mode: DVBSViewMode = DVBSViewMode.REGISTRATIONS,
     userRole: String = "general", // "admin", "resource", "registration", "general"
-    onNavigateToResourceEntry: () -> Unit = {},
-    onNavigateToRegistrationEntry: () -> Unit = {}
+    onNavigateToResourceEntry: (String?) -> Unit = {},
+    onNavigateToRegistrationEntry: (String?) -> Unit = {}
 ) {
     val registrations by dvbsViewModel.dvbsRegistrations.collectAsState()
     val resources by dvbsViewModel.dvbsResources.collectAsState()
@@ -56,6 +58,11 @@ fun DVBSScreen(
 
     var fabExpanded by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
+
+    // State for delete confirmation
+    var showDeleteDialog by remember { mutableStateOf(false) }
+    var itemToDeleteId by remember { mutableStateOf<String?>(null) }
+    var isDeletingRegistration by remember { mutableStateOf(true) }
 
     // Determine the view mode if not explicitly set (for the swipeable page)
     val effectiveMode = when {
@@ -148,7 +155,6 @@ fun DVBSScreen(
                         contentColor
                     )
                 } else {
-                    // Group filtered registrations by day
                     val groupedRegistrations = filteredRegistrations.groupBy { it.dvbsDay }
                         .toSortedMap(compareBy { it })
 
@@ -164,7 +170,14 @@ fun DVBSScreen(
                                     registrations = dayRegistrations,
                                     contentColor = contentColor,
                                     isDarkMode = isDarkMode,
-                                    isSearchActive = searchQuery.isNotBlank()
+                                    isSearchActive = searchQuery.isNotBlank(),
+                                    isAdmin = userRole == "admin",
+                                    onEdit = { onNavigateToRegistrationEntry(it.id) },
+                                    onDelete = { 
+                                        itemToDeleteId = it.id
+                                        isDeletingRegistration = true
+                                        showDeleteDialog = true
+                                    }
                                 )
                             }
                         }
@@ -183,7 +196,17 @@ fun DVBSScreen(
                         contentPadding = PaddingValues(bottom = 80.dp)
                     ) {
                         items(filteredResources) { resource ->
-                            DVBSResourceItem(resource, contentColor)
+                            DVBSResourceItem(
+                                resource = resource,
+                                contentColor = contentColor,
+                                isAdmin = userRole == "admin",
+                                onEdit = { onNavigateToResourceEntry(resource.id) },
+                                onDelete = {
+                                    itemToDeleteId = resource.id
+                                    isDeletingRegistration = false
+                                    showDeleteDialog = true
+                                }
+                            )
                         }
                     }
                 }
@@ -202,13 +225,13 @@ fun DVBSScreen(
                         expanded = fabExpanded,
                         onExpandedChange = { fabExpanded = it },
                         primaryColor = primaryColor,
-                        onAddRegistration = onNavigateToRegistrationEntry,
-                        onAddResource = onAddResourceEntry(userRole, effectiveMode, onNavigateToResourceEntry)
+                        onAddRegistration = { onNavigateToRegistrationEntry(null) },
+                        onAddResource = { onNavigateToResourceEntry(null) }
                     )
                 }
                 "registration" -> {
                     FloatingActionButton(
-                        onClick = onNavigateToRegistrationEntry,
+                        onClick = { onNavigateToRegistrationEntry(null) },
                         containerColor = primaryColor,
                         contentColor = Color.White,
                         shape = CircleShape
@@ -218,7 +241,7 @@ fun DVBSScreen(
                 }
                 "resource" -> {
                     FloatingActionButton(
-                        onClick = onNavigateToResourceEntry,
+                        onClick = { onNavigateToResourceEntry(null) },
                         containerColor = primaryColor,
                         contentColor = Color.White,
                         shape = CircleShape
@@ -229,11 +252,38 @@ fun DVBSScreen(
             }
         }
     }
-}
 
-// Helper to determine resource entry navigation
-private fun onAddResourceEntry(userRole: String, mode: DVBSViewMode, onNav: () -> Unit): () -> Unit {
-    return onNav
+    // Delete Confirmation Dialog
+    if (showDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            title = { Text("Confirm Delete") },
+            text = { Text("Are you sure you want to delete this entry? This action cannot be undone.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        itemToDeleteId?.let { id ->
+                            if (isDeletingRegistration) {
+                                dvbsViewModel.deleteDVBSRegistration(id)
+                            } else {
+                                dvbsViewModel.deleteDVBSResource(id)
+                            }
+                        }
+                        showDeleteDialog = false
+                        itemToDeleteId = null
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = Color.Red)
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -242,9 +292,11 @@ fun DVBSRegistrationDayGroup(
     registrations: List<DVBSRegistration>,
     contentColor: Color,
     isDarkMode: Boolean,
-    isSearchActive: Boolean = false
+    isSearchActive: Boolean = false,
+    isAdmin: Boolean = false,
+    onEdit: (DVBSRegistration) -> Unit = {},
+    onDelete: (DVBSRegistration) -> Unit = {}
 ) {
-    // Automatically expand if a search is active to show results immediately
     var isExpanded by remember(isSearchActive) { mutableStateOf(isSearchActive) }
 
     Card(
@@ -290,7 +342,13 @@ fun DVBSRegistrationDayGroup(
                 ) {
                     HorizontalDivider(color = contentColor.copy(alpha = 0.1f))
                     registrations.forEach { registration ->
-                        DVBSRegistrationDetailItem(registration, contentColor)
+                        DVBSRegistrationDetailItem(
+                            registration = registration,
+                            contentColor = contentColor,
+                            isAdmin = isAdmin,
+                            onEdit = { onEdit(registration) },
+                            onDelete = { onDelete(registration) }
+                        )
                         if (registration != registrations.last()) {
                             HorizontalDivider(
                                 modifier = Modifier.padding(horizontal = 8.dp),
@@ -305,39 +363,57 @@ fun DVBSRegistrationDayGroup(
 }
 
 @Composable
-private fun DVBSRegistrationDetailItem(registration: DVBSRegistration, contentColor: Color) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            text = registration.childName,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = contentColor
-        )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
+private fun DVBSRegistrationDetailItem(
+    registration: DVBSRegistration,
+    contentColor: Color,
+    isAdmin: Boolean,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = "Age: ${registration.age}",
-                style = MaterialTheme.typography.bodySmall,
-                color = contentColor.copy(alpha = 0.8f)
+                text = registration.childName,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = contentColor
             )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text(
+                    text = "Age: ${registration.age}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = contentColor.copy(alpha = 0.8f)
+                )
+                Text(
+                    text = "Grade: ${registration.gradeClass}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = contentColor.copy(alpha = 0.8f)
+                )
+            }
             Text(
-                text = "Grade: ${registration.gradeClass}",
+                text = "Guardian: ${registration.parentGuardianName} (${registration.parentGuardianPhone})",
                 style = MaterialTheme.typography.bodySmall,
                 color = contentColor.copy(alpha = 0.8f)
             )
         }
-        Text(
-            text = "Guardian: ${registration.parentGuardianName} (${registration.parentGuardianPhone})",
-            style = MaterialTheme.typography.bodySmall,
-            color = contentColor.copy(alpha = 0.8f)
-        )
-        Text(
-            text = "Registered on: ${registration.registrationDate}",
-            style = MaterialTheme.typography.labelSmall,
-            color = contentColor.copy(alpha = 0.5f)
-        )
+        
+        if (isAdmin) {
+            Row {
+                IconButton(onClick = onEdit) {
+                    Icon(Icons.Default.Edit, contentDescription = "Edit", tint = Color.Gray, modifier = Modifier.size(20.dp))
+                }
+                IconButton(onClick = onDelete) {
+                    Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.Red.copy(alpha = 0.7f), modifier = Modifier.size(20.dp))
+                }
+            }
+        }
     }
 }
 
@@ -357,13 +433,30 @@ fun EmptyListPlaceholder(message: String, contentColor: Color) {
 }
 
 @Composable
-private fun DVBSResourceItem(resource: DVBSResource, contentColor: Color) {
+private fun DVBSResourceItem(
+    resource: DVBSResource,
+    contentColor: Color,
+    isAdmin: Boolean = false,
+    onEdit: () -> Unit = {},
+    onDelete: () -> Unit = {}
+) {
     Card(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Text(resource.dvbsDay, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = contentColor)
-                Text(resource.date, style = MaterialTheme.typography.labelSmall, color = contentColor.copy(alpha = 0.6f))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(resource.date, style = MaterialTheme.typography.labelSmall, color = contentColor.copy(alpha = 0.6f))
+                    if (isAdmin) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        IconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
+                            Icon(Icons.Default.Edit, contentDescription = "Edit", tint = Color.Gray, modifier = Modifier.size(18.dp))
+                        }
+                        IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
+                            Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.Red.copy(alpha = 0.7f), modifier = Modifier.size(18.dp))
+                        }
+                    }
+                }
             }
             Text("Grade: ${resource.grade}", fontWeight = FontWeight.Medium)
             Text("Teacher: ${resource.teacherName}")

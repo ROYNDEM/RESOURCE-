@@ -29,7 +29,8 @@ import java.util.UUID
 fun DVBSRegistrationEntryScreen(
     dvbsViewModel: DVBSViewModel = viewModel(),
     onNavigateBack: () -> Unit,
-    isDarkMode: Boolean = false
+    isDarkMode: Boolean = false,
+    registrationId: String? = null
 ) {
     var childName by rememberSaveable { mutableStateOf("") }
     var ageString by rememberSaveable { mutableStateOf("") }
@@ -47,10 +48,27 @@ fun DVBSRegistrationEntryScreen(
     var gradeClassError by rememberSaveable { mutableStateOf<String?>(null) }
     var parentNameError by rememberSaveable { mutableStateOf<String?>(null) }
     var parentPhoneError by rememberSaveable { mutableStateOf<String?>(null) }
-    var eventDateError by rememberSaveable { mutableStateOf<String?>(null) }
     var dvbsDayError by rememberSaveable { mutableStateOf<String?>(null) }
 
     var gradeExpanded by remember { mutableStateOf(false) }
+
+    val registrations by dvbsViewModel.dvbsRegistrations.collectAsState()
+
+    // Pre-populate if editing
+    LaunchedEffect(registrationId, registrations) {
+        if (registrationId != null) {
+            val existing = registrations.find { it.id == registrationId }
+            if (existing != null) {
+                childName = existing.childName
+                ageString = existing.age.toString()
+                gradeClass = existing.gradeClass
+                parentGuardianName = existing.parentGuardianName
+                parentGuardianPhone = existing.parentGuardianPhone
+                eventDate = existing.eventDate
+                dvbsDay = existing.dvbsDay
+            }
+        }
+    }
 
     val primaryColor = Color(0xFFC62828)
     val lightModeBackground = Color(0xFFF0F0F0)
@@ -60,23 +78,6 @@ fun DVBSRegistrationEntryScreen(
         "Playgroup", "PP1", "PP2", "Grade 1", "Grade 2", "Grade 3",
         "Grade 4", "Grade 5", "Grade 6", "Grade 7", "Grade 8"
     )
-
-    fun clearForm() {
-        childName = ""
-        ageString = ""
-        gradeClass = ""
-        parentGuardianName = ""
-        parentGuardianPhone = ""
-        eventDate = ""
-        dvbsDay = ""
-        childNameError = null
-        ageError = null
-        gradeClassError = null
-        parentNameError = null
-        parentPhoneError = null
-        eventDateError = null
-        dvbsDayError = null
-    }
 
     fun validateFields(): Boolean {
         childNameError = if (childName.isBlank()) "Child's name cannot be empty" else null
@@ -92,7 +93,6 @@ fun DVBSRegistrationEntryScreen(
             parentGuardianPhone.length < 9 -> "Phone number must be at least 9 digits"
             else -> null
         }
-        eventDateError = if (eventDate.isBlank()) "Event date cannot be empty" else null
         dvbsDayError = if (dvbsDay.isBlank()) "DVBS day cannot be empty" else null
 
         return childNameError == null &&
@@ -100,14 +100,13 @@ fun DVBSRegistrationEntryScreen(
                 gradeClassError == null &&
                 parentNameError == null &&
                 parentPhoneError == null &&
-                eventDateError == null &&
                 dvbsDayError == null
     }
 
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("DVBS Registration") },
+                title = { Text(if (registrationId == null) "DVBS Registration" else "Edit Registration") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -148,12 +147,8 @@ fun DVBSRegistrationEntryScreen(
                     text = childNameError!!,
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.labelSmall,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = 16.dp, top = 2.dp, bottom = 6.dp)
+                    modifier = Modifier.padding(start = 16.dp)
                 )
-            } else {
-                Spacer(modifier = Modifier.height(4.dp))
             }
 
             OutlinedTextField(
@@ -176,12 +171,8 @@ fun DVBSRegistrationEntryScreen(
                     text = ageError!!,
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.labelSmall,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = 16.dp, top = 2.dp, bottom = 6.dp)
+                    modifier = Modifier.padding(start = 16.dp)
                 )
-            } else {
-                Spacer(modifier = Modifier.height(4.dp))
             }
 
             ExposedDropdownMenuBox(
@@ -223,12 +214,8 @@ fun DVBSRegistrationEntryScreen(
                     text = gradeClassError!!,
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.labelSmall,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = 16.dp, top = 2.dp, bottom = 6.dp)
+                    modifier = Modifier.padding(start = 16.dp)
                 )
-            } else {
-                Spacer(modifier = Modifier.height(4.dp))
             }
 
             OutlinedTextField(
@@ -249,12 +236,8 @@ fun DVBSRegistrationEntryScreen(
                     text = parentNameError!!,
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.labelSmall,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = 16.dp, top = 2.dp, bottom = 6.dp)
+                    modifier = Modifier.padding(start = 16.dp)
                 )
-            } else {
-                Spacer(modifier = Modifier.height(4.dp))
             }
 
             OutlinedTextField(
@@ -278,12 +261,8 @@ fun DVBSRegistrationEntryScreen(
                     text = parentPhoneError!!,
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.labelSmall,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = 16.dp, top = 2.dp, bottom = 6.dp)
+                    modifier = Modifier.padding(start = 16.dp)
                 )
-            } else {
-                Spacer(modifier = Modifier.height(12.dp))
             }
 
             OutlinedTextField(
@@ -295,7 +274,6 @@ fun DVBSRegistrationEntryScreen(
                 singleLine = true,
                 shape = RoundedCornerShape(12.dp)
             )
-            Spacer(modifier = Modifier.height(4.dp))
 
             OutlinedTextField(
                 value = dvbsDay,
@@ -315,22 +293,17 @@ fun DVBSRegistrationEntryScreen(
                     text = dvbsDayError!!,
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.labelSmall,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = 16.dp, top = 2.dp, bottom = 6.dp)
+                    modifier = Modifier.padding(start = 16.dp)
                 )
-            } else {
-                Spacer(modifier = Modifier.height(12.dp))
             }
+
+            Spacer(modifier = Modifier.height(16.dp))
 
             Button(
                 onClick = {
                     if (validateFields()) {
-                        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-                        val registrationDate = sdf.format(Date())
-
                         val newRegistration = DVBSRegistration(
-                            id = UUID.randomUUID().toString(),
+                            id = registrationId ?: UUID.randomUUID().toString(),
                             childName = childName,
                             age = ageString.toIntOrNull() ?: 0,
                             gradeClass = gradeClass,
@@ -338,13 +311,12 @@ fun DVBSRegistrationEntryScreen(
                             parentGuardianPhone = parentGuardianPhone,
                             eventDate = eventDate,
                             dvbsDay = dvbsDay,
-                            registrationDate = registrationDate,
+                            registrationDate = if (registrationId == null) sdf.format(Date()) else eventDate, // Use existing if editing
                             registeredBy = FirebaseAuth.getInstance().currentUser?.email ?: "Unknown",
                             createdAt = Date()
                         )
 
                         dvbsViewModel.addDVBSRegistration(newRegistration)
-                        clearForm()
                         onNavigateBack()
                     }
                 },
@@ -356,7 +328,7 @@ fun DVBSRegistrationEntryScreen(
                         && parentGuardianName.isNotBlank() && parentGuardianPhone.isNotBlank()
                         && eventDate.isNotBlank() && dvbsDay.isNotBlank()
             ) {
-                Text("Register Child", color = Color.White, fontWeight = FontWeight.Bold)
+                Text(if (registrationId == null) "Register Child" else "Update Registration", color = Color.White, fontWeight = FontWeight.Bold)
             }
 
             Spacer(modifier = Modifier.height(16.dp))

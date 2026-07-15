@@ -21,6 +21,14 @@ object AppDestinations {
     const val ADMIN_ADD_ENTRY_ROUTE = "admin_add_entry"
     const val ADMIN_INVENTORY_ROUTE = "admin_inventory"
 
+    fun dvbsResourceEntryRoute(id: String? = null): String {
+        return if (id != null) "dvbs_resource_entry?id=$id" else "dvbs_resource_entry"
+    }
+
+    fun dvbsRegistrationEntryRoute(id: String? = null): String {
+        return if (id != null) "dvbs_registration_entry?id=$id" else "dvbs_registration_entry"
+    }
+
     fun reportDetailRoute(date: String): String {
         return "admin_reports_detail/$date"
     }

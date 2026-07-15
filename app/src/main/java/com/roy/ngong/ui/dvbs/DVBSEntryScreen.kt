@@ -22,7 +22,8 @@ import java.util.*
 fun DVBSEntryScreen(
     dvbsViewModel: DVBSViewModel = viewModel(),
     onNavigateBack: () -> Unit,
-    isDarkMode: Boolean = false
+    isDarkMode: Boolean = false,
+    resourceId: String? = null
 ) {
     var dvbsDay by remember { mutableStateOf("") }
     var teacherName by remember { mutableStateOf("") }
@@ -37,7 +38,31 @@ fun DVBSEntryScreen(
     val gradeBases = listOf("Playgroup", "PP1", "PP2") + (1..8).map { "Grade $it" }
     val streams = listOf("A", "B", "C", "D")
     
-    val selectedDate = remember { getCurrentDate() }
+    var selectedDate by remember { mutableStateOf(getCurrentDate()) }
+
+    val resources by dvbsViewModel.dvbsResources.collectAsState()
+
+    // Pre-populate if editing
+    LaunchedEffect(resourceId, resources) {
+        if (resourceId != null) {
+            val existing = resources.find { it.id == resourceId }
+            if (existing != null) {
+                dvbsDay = existing.dvbsDay
+                teacherName = existing.teacherName
+                numChildren = existing.numChildren.toString()
+                numNewSalvations = existing.numNewSalvations.toString()
+                numWorkers = existing.numWorkers.toString()
+                selectedDate = existing.date
+                
+                // Parse grade into base and stream
+                val parts = existing.grade.split(" ")
+                if (parts.size >= 2) {
+                    selectedStream = parts.last()
+                    selectedGradeBase = existing.grade.removeSuffix(" $selectedStream")
+                }
+            }
+        }
+    }
 
     val primaryColor = Color(0xFFC62828)
     val lightModeBackground = Color(0xFFF0F0F0)
@@ -46,7 +71,7 @@ fun DVBSEntryScreen(
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("Add DVBS Resource Entry") },
+                title = { Text(if (resourceId == null) "Add DVBS Resource Entry" else "Edit Resource Entry") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -175,7 +200,7 @@ fun DVBSEntryScreen(
             Button(
                 onClick = {
                     val resource = DVBSResource(
-                        id = UUID.randomUUID().toString(),
+                        id = resourceId ?: UUID.randomUUID().toString(),
                         date = selectedDate,
                         dvbsDay = dvbsDay,
                         grade = "$selectedGradeBase $selectedStream",
@@ -195,7 +220,7 @@ fun DVBSEntryScreen(
                 colors = ButtonDefaults.buttonColors(containerColor = primaryColor),
                 enabled = teacherName.isNotBlank() && dvbsDay.isNotBlank()
             ) {
-                Text("Save DVBS Resource Entry", color = Color.White, fontWeight = FontWeight.Bold)
+                Text(if (resourceId == null) "Save DVBS Resource Entry" else "Update Resource Entry", color = Color.White, fontWeight = FontWeight.Bold)
             }
         }
     }

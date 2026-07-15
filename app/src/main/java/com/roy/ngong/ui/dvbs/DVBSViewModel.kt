@@ -171,4 +171,38 @@ class DVBSViewModel : ViewModel() {
             }
         }
     }
+
+    fun deleteDVBSResource(id: String) {
+        viewModelScope.launch {
+            try {
+                db.collection("dvbs_resources").document(id).delete()
+                    .addOnSuccessListener {
+                        Log.d("DVBSViewModel", "Resource deleted successfully")
+                        fetchDVBSResources()
+                    }
+                    .addOnFailureListener { e ->
+                        Log.e("DVBSViewModel", "Error deleting DVBS resource", e)
+                    }
+            } catch (e: Exception) {
+                Log.e("DVBSViewModel", "Exception in deleteDVBSResource", e)
+            }
+        }
+    }
+
+    fun deleteDVBSRegistration(id: String) {
+        viewModelScope.launch {
+            try {
+                db.collection("dvbs_registrations").document(id).delete()
+                    .addOnSuccessListener {
+                        Log.d("DVBSViewModel", "Registration deleted successfully")
+                        fetchDVBSRegistrations()
+                    }
+                    .addOnFailureListener { e ->
+                        Log.e("DVBSViewModel", "Error deleting DVBS registration", e)
+                    }
+            } catch (e: Exception) {
+                Log.e("DVBSViewModel", "Exception in deleteDVBSRegistration", e)
+            }
+        }
+    }
 }

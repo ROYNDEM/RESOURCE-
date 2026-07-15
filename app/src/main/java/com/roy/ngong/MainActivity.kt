@@ -170,8 +170,12 @@ fun AppNavigator(
                 onProfileClick = { navController.navigate(AppDestinations.PROFILE_ROUTE) },
                 onNavigateToPending = { navController.navigate(AppDestinations.RESOURCE_EDIT_ROUTE) },
                 onNavigateToEntry = { navController.navigate(AppDestinations.RESOURCE_ENTRY_ROUTE) },
-                onNavigateToDVBSResourceEntry = { navController.navigate(AppDestinations.DVBS_RESOURCE_ENTRY_ROUTE) },
-                onNavigateToDVBSRegistrationEntry = { navController.navigate(AppDestinations.DVBS_REGISTRATION_ENTRY_ROUTE) },
+                onNavigateToDVBSResourceEntry = { id: String? -> 
+                    navController.navigate(AppDestinations.dvbsResourceEntryRoute(id)) 
+                },
+                onNavigateToDVBSRegistrationEntry = { id: String? ->
+                    navController.navigate(AppDestinations.dvbsRegistrationEntryRoute(id)) 
+                },
                 isDarkMode = isDarkMode,
                 onThemeToggle = onThemeToggle
             )
@@ -190,21 +194,31 @@ fun AppNavigator(
             )
         }
 
-        composable(AppDestinations.DVBS_RESOURCE_ENTRY_ROUTE) {
+        composable(
+            route = "dvbs_resource_entry?id={id}",
+            arguments = listOf(navArgument("id") { nullable = true; defaultValue = null })
+        ) { backStackEntry ->
+            val id = backStackEntry.arguments?.getString("id")
             val dvbsViewModel: com.roy.ngong.ui.dvbs.DVBSViewModel = viewModel()
             com.roy.ngong.ui.dvbs.DVBSEntryScreen(
                 dvbsViewModel = dvbsViewModel,
                 onNavigateBack = { navController.popBackStack() },
-                isDarkMode = isDarkMode
+                isDarkMode = isDarkMode,
+                resourceId = id
             )
         }
 
-        composable(AppDestinations.DVBS_REGISTRATION_ENTRY_ROUTE) {
+        composable(
+            route = "dvbs_registration_entry?id={id}",
+            arguments = listOf(navArgument("id") { nullable = true; defaultValue = null })
+        ) { backStackEntry ->
+            val id = backStackEntry.arguments?.getString("id")
             val dvbsViewModel: com.roy.ngong.ui.dvbs.DVBSViewModel = viewModel()
             com.roy.ngong.ui.dvbs.DVBSRegistrationEntryScreen(
                 dvbsViewModel = dvbsViewModel,
                 onNavigateBack = { navController.popBackStack() },
-                isDarkMode = isDarkMode
+                isDarkMode = isDarkMode,
+                registrationId = id
             )
         }
 
@@ -244,8 +258,12 @@ fun AppNavigator(
                         isDarkMode = isDarkMode,
                         userRole = userRole,
                         mode = com.roy.ngong.ui.dvbs.DVBSViewMode.RESOURCES,
-                        onNavigateToResourceEntry = { navController.navigate(AppDestinations.DVBS_RESOURCE_ENTRY_ROUTE) },
-                        onNavigateToRegistrationEntry = { navController.navigate(AppDestinations.DVBS_REGISTRATION_ENTRY_ROUTE) }
+                        onNavigateToResourceEntry = { id -> 
+                            navController.navigate(AppDestinations.dvbsResourceEntryRoute(id)) 
+                        },
+                        onNavigateToRegistrationEntry = { id -> 
+                            navController.navigate(AppDestinations.dvbsRegistrationEntryRoute(id)) 
+                        }
                     )
                 }
             }
@@ -287,8 +305,12 @@ fun AppNavigator(
                         isDarkMode = isDarkMode,
                         userRole = userRole,
                         mode = com.roy.ngong.ui.dvbs.DVBSViewMode.REGISTRATIONS,
-                        onNavigateToResourceEntry = { navController.navigate(AppDestinations.DVBS_RESOURCE_ENTRY_ROUTE) },
-                        onNavigateToRegistrationEntry = { navController.navigate(AppDestinations.DVBS_REGISTRATION_ENTRY_ROUTE) }
+                        onNavigateToResourceEntry = { id -> 
+                            navController.navigate(AppDestinations.dvbsResourceEntryRoute(id)) 
+                        },
+                        onNavigateToRegistrationEntry = { id -> 
+                            navController.navigate(AppDestinations.dvbsRegistrationEntryRoute(id)) 
+                        }
                     )
                 }
             }
