@@ -33,6 +33,7 @@ data class DVBSResource(
     val numChildren: Int = 0,
     val numNewSalvations: Int = 0,
     val numWorkers: Int = 0,
+    val genderCategory: String = "Mixed",
     val recordedBy: String = "",
     @ServerTimestamp
     val createdAt: Date? = null,
@@ -60,6 +61,7 @@ data class DVBSRegistration(
     val dvbsDay: String = "",
     val registrationDate: String = "",
     val registeredBy: String = "",
+    val gender: String = "Not Specified",
     @ServerTimestamp
     val createdAt: Date? = null,
     val lastModified: Date? = null

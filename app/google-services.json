@@ -38,6 +38,14 @@
           }
         },
         {
+          "client_id": "503247305701-ovcro06m5rgobobju61cqgc9vab5ojhf.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.roy.ngong",
+            "certificate_hash": "9f9e70cdf66837807f1e8cff18da7af9694579c9"
+          }
+        },
+        {
           "client_id": "503247305701-8qfb16j735pkqdarudlq6oontpk56onf.apps.googleusercontent.com",
           "client_type": 3
         }

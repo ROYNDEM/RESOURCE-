@@ -50,6 +50,7 @@ fun LoginScreen(
     val context = LocalContext.current
 
     val authStatus by authViewModel.authStatus.collectAsState()
+    val errorMessage by authViewModel.errorMessage.collectAsState()
     val isLoading = authStatus == AuthStatus.LOADING
 
     // --- Annotated Strings for Links ---
@@ -79,6 +80,9 @@ fun LoginScreen(
             navController.navigate(AppDestinations.HOME_SCREEN_ROUTE) {
                 popUpTo(AppDestinations.LOGIN_ROUTE) { inclusive = true }
             }
+            authViewModel.resetStatus()
+        } else if (authStatus == AuthStatus.ERROR) {
+            Toast.makeText(context, errorMessage ?: "An error occurred", Toast.LENGTH_LONG).show()
             authViewModel.resetStatus()
         }
     }

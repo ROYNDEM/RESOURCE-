@@ -392,6 +392,11 @@ private fun DVBSRegistrationDetailItem(
                     color = contentColor.copy(alpha = 0.8f)
                 )
                 Text(
+                    text = "Gender: ${registration.gender}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = contentColor.copy(alpha = 0.8f)
+                )
+                Text(
                     text = "Grade: ${registration.gradeClass}",
                     style = MaterialTheme.typography.bodySmall,
                     color = contentColor.copy(alpha = 0.8f)
@@ -458,7 +463,10 @@ private fun DVBSResourceItem(
                     }
                 }
             }
-            Text("Grade: ${resource.grade}", fontWeight = FontWeight.Medium)
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Grade: ${resource.grade}", fontWeight = FontWeight.Medium)
+                Text("(${resource.genderCategory})", fontWeight = FontWeight.Medium, color = contentColor.copy(alpha = 0.7f))
+            }
             Text("Teacher: ${resource.teacherName}")
             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {

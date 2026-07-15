@@ -34,9 +34,11 @@ fun DVBSEntryScreen(
     // Grade selection
     var selectedGradeBase by remember { mutableStateOf("Playgroup") }
     var selectedStream by remember { mutableStateOf("A") }
+    var selectedGenderCategory by remember { mutableStateOf("Mixed") }
     
     val gradeBases = listOf("Playgroup", "PP1", "PP2") + (1..8).map { "Grade $it" }
     val streams = listOf("A", "B", "C", "D")
+    val genderCategories = listOf("Mixed", "Boys", "Girls")
     
     var selectedDate by remember { mutableStateOf(getCurrentDate()) }
 
@@ -53,6 +55,7 @@ fun DVBSEntryScreen(
                 numNewSalvations = existing.numNewSalvations.toString()
                 numWorkers = existing.numWorkers.toString()
                 selectedDate = existing.date
+                selectedGenderCategory = existing.genderCategory
                 
                 // Parse grade into base and stream
                 val parts = existing.grade.split(" ")
@@ -167,6 +170,37 @@ fun DVBSEntryScreen(
                 }
             }
 
+            // Gender Category Dropdown
+            var genderExpanded by remember { mutableStateOf(false) }
+            ExposedDropdownMenuBox(
+                expanded = genderExpanded,
+                onExpandedChange = { genderExpanded = !genderExpanded },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                OutlinedTextField(
+                    value = selectedGenderCategory,
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("Category (e.g. Boys/Girls)") },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = genderExpanded) },
+                    modifier = Modifier.fillMaxWidth().menuAnchor()
+                )
+                ExposedDropdownMenu(
+                    expanded = genderExpanded,
+                    onDismissRequest = { genderExpanded = false }
+                ) {
+                    genderCategories.forEach { category ->
+                        DropdownMenuItem(
+                            text = { Text(category) },
+                            onClick = {
+                                selectedGenderCategory = category
+                                genderExpanded = false
+                            }
+                        )
+                    }
+                }
+            }
+
             OutlinedTextField(
                 value = teacherName,
                 onValueChange = { teacherName = it },
@@ -208,6 +242,7 @@ fun DVBSEntryScreen(
                         numChildren = numChildren.toIntOrNull() ?: 0,
                         numNewSalvations = numNewSalvations.toIntOrNull() ?: 0,
                         numWorkers = numWorkers.toIntOrNull() ?: 0,
+                        genderCategory = selectedGenderCategory,
                         recordedBy = FirebaseAuth.getInstance().currentUser?.email ?: "Unknown",
                         createdAt = Date()
                     )

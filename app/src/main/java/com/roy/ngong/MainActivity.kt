@@ -70,11 +70,16 @@ class MainActivity : ComponentActivity() {
         val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
         try {
             val account = task.getResult(ApiException::class.java)
-            account?.idToken?.let {
-                authViewModel.signInWithGoogle(it)
+            val idToken = account?.idToken
+            if (idToken != null) {
+                authViewModel.signInWithGoogle(idToken)
+            } else {
+                android.util.Log.e("MainActivity", "Google Sign-In failed: ID Token is null")
+                authViewModel.setSignInError("Google Sign-In failed: ID Token is null")
             }
         } catch (e: ApiException) {
-            // Handle sign-in failure
+            android.util.Log.e("MainActivity", "Google Sign-In failed: ${e.statusCode}", e)
+            authViewModel.setSignInError("Google Sign-In failed: ${e.message}")
         }
     }
 

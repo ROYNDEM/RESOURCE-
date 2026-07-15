@@ -37,6 +37,7 @@ fun DVBSRegistrationEntryScreen(
     var gradeClass by rememberSaveable { mutableStateOf("") }
     var parentGuardianName by rememberSaveable { mutableStateOf("") }
     var parentGuardianPhone by rememberSaveable { mutableStateOf("") }
+    var selectedGender by rememberSaveable { mutableStateOf("Boy") }
     
     // Auto-populate event date with today's date
     val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
@@ -66,6 +67,7 @@ fun DVBSRegistrationEntryScreen(
                 parentGuardianPhone = existing.parentGuardianPhone
                 eventDate = existing.eventDate
                 dvbsDay = existing.dvbsDay
+                selectedGender = existing.gender
             }
         }
     }
@@ -173,6 +175,29 @@ fun DVBSRegistrationEntryScreen(
                     style = MaterialTheme.typography.labelSmall,
                     modifier = Modifier.padding(start = 16.dp)
                 )
+            }
+
+            // Gender Selection
+            Text("Gender", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    RadioButton(
+                        selected = selectedGender == "Boy",
+                        onClick = { selectedGender = "Boy" }
+                    )
+                    Text("Boy")
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    RadioButton(
+                        selected = selectedGender == "Girl",
+                        onClick = { selectedGender = "Girl" }
+                    )
+                    Text("Girl")
+                }
             }
 
             ExposedDropdownMenuBox(
@@ -311,6 +336,7 @@ fun DVBSRegistrationEntryScreen(
                             parentGuardianPhone = parentGuardianPhone,
                             eventDate = eventDate,
                             dvbsDay = dvbsDay,
+                            gender = selectedGender,
                             registrationDate = if (registrationId == null) sdf.format(Date()) else eventDate, // Use existing if editing
                             registeredBy = FirebaseAuth.getInstance().currentUser?.email ?: "Unknown",
                             createdAt = Date()
