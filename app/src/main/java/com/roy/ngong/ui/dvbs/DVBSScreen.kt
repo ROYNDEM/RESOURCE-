@@ -35,10 +35,16 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.roy.ngong.data.DVBSRegistration
 import com.roy.ngong.data.DVBSResource
 
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+
 enum class DVBSViewMode {
     RESOURCES, REGISTRATIONS
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DVBSScreen(
     dvbsViewModel: DVBSViewModel = viewModel(),
@@ -58,6 +64,17 @@ fun DVBSScreen(
 
     var fabExpanded by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
+    var isRefreshing by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
+    val onRefresh = {
+        scope.launch {
+            isRefreshing = true
+            dvbsViewModel.startListening()
+            delay(1000)
+            isRefreshing = false
+        }
+    }
 
     // State for delete confirmation
     var showDeleteDialog by remember { mutableStateOf(false) }
@@ -118,6 +135,9 @@ fun DVBSScreen(
                     color = contentColor,
                     modifier = Modifier.weight(1f)
                 )
+                IconButton(onClick = { onRefresh() }) {
+                    Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = primaryColor)
+                }
             }
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -148,65 +168,79 @@ fun DVBSScreen(
                 )
             )
 
-            if (effectiveMode == DVBSViewMode.REGISTRATIONS) {
-                if (filteredRegistrations.isEmpty()) {
-                    EmptyListPlaceholder(
-                        if (searchQuery.isEmpty()) "No registrations yet." else "No matches found for \"$searchQuery\"",
-                        contentColor
-                    )
-                } else {
-                    val groupedRegistrations = filteredRegistrations.groupBy { it.dvbsDay }
-                        .toSortedMap(compareBy { it })
+            PullToRefreshBox(
+                isRefreshing = isRefreshing,
+                onRefresh = { onRefresh() },
+                modifier = Modifier.fillMaxSize()
+            ) {
+                if (effectiveMode == DVBSViewMode.REGISTRATIONS) {
+                    if (filteredRegistrations.isEmpty()) {
+                        EmptyListPlaceholder(
+                            if (searchQuery.isEmpty()) "No registrations yet." else "No matches found for \"$searchQuery\"",
+                            contentColor
+                        )
+                    } else {
+                        val groupedRegistrations = filteredRegistrations.groupBy { it.dvbsDay }
+                            .toSortedMap(compareBy { it })
 
-                    LazyColumn(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(16.dp),
-                        contentPadding = PaddingValues(bottom = 80.dp)
-                    ) {
-                        groupedRegistrations.forEach { (day, dayRegistrations) ->
-                            item(key = day) {
-                                DVBSRegistrationDayGroup(
-                                    day = day,
-                                    registrations = dayRegistrations,
-                                    contentColor = contentColor,
-                                    isDarkMode = isDarkMode,
-                                    isSearchActive = searchQuery.isNotBlank(),
-                                    isAdmin = userRole == "admin",
-                                    onEdit = { onNavigateToRegistrationEntry(it.id) },
-                                    onDelete = { 
-                                        itemToDeleteId = it.id
-                                        isDeletingRegistration = true
-                                        showDeleteDialog = true
-                                    }
-                                )
+                        LazyColumn(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(16.dp),
+                            contentPadding = PaddingValues(bottom = 80.dp)
+                        ) {
+                            groupedRegistrations.forEach { (day, dayRegistrations) ->
+                                item(key = day) {
+                                    DVBSRegistrationDayGroup(
+                                        day = day,
+                                        registrations = dayRegistrations,
+                                        contentColor = contentColor,
+                                        isDarkMode = isDarkMode,
+                                        isSearchActive = searchQuery.isNotBlank(),
+                                        isAdmin = userRole == "admin",
+                                        onEdit = { onNavigateToRegistrationEntry(it.id) },
+                                        onDelete = { 
+                                            itemToDeleteId = it.id
+                                            isDeletingRegistration = true
+                                            showDeleteDialog = true
+                                        }
+                                    )
+                                }
                             }
                         }
                     }
-                }
-            } else {
-                if (filteredResources.isEmpty()) {
-                    EmptyListPlaceholder(
-                        if (searchQuery.isEmpty()) "No resource entries yet." else "No matches found for \"$searchQuery\"",
-                        contentColor
-                    )
                 } else {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                        contentPadding = PaddingValues(bottom = 80.dp)
-                    ) {
-                        items(filteredResources) { resource ->
-                            DVBSResourceItem(
-                                resource = resource,
-                                contentColor = contentColor,
-                                isAdmin = userRole == "admin",
-                                onEdit = { onNavigateToResourceEntry(resource.id) },
-                                onDelete = {
-                                    itemToDeleteId = resource.id
-                                    isDeletingRegistration = false
-                                    showDeleteDialog = true
+                    if (filteredResources.isEmpty()) {
+                        EmptyListPlaceholder(
+                            if (searchQuery.isEmpty()) "No resource entries yet." else "No matches found for \"$searchQuery\"",
+                            contentColor
+                        )
+                    } else {
+                        val groupedResources = filteredResources.groupBy { it.dvbsDay }
+                            .toSortedMap(compareBy { it })
+
+                        LazyColumn(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(16.dp),
+                            contentPadding = PaddingValues(bottom = 80.dp)
+                        ) {
+                            groupedResources.forEach { (day, dayResources) ->
+                                item(key = day) {
+                                    DVBSResourceDayGroup(
+                                        day = day,
+                                        resources = dayResources,
+                                        contentColor = contentColor,
+                                        isDarkMode = isDarkMode,
+                                        isSearchActive = searchQuery.isNotBlank(),
+                                        isAdmin = userRole == "admin",
+                                        onEdit = { onNavigateToResourceEntry(it.id) },
+                                        onDelete = {
+                                            itemToDeleteId = it.id
+                                            isDeletingRegistration = false
+                                            showDeleteDialog = true
+                                        }
+                                    )
                                 }
-                            )
+                            }
                         }
                     }
                 }
@@ -438,6 +472,82 @@ fun EmptyListPlaceholder(message: String, contentColor: Color) {
 }
 
 @Composable
+fun DVBSResourceDayGroup(
+    day: String,
+    resources: List<DVBSResource>,
+    contentColor: Color,
+    isDarkMode: Boolean,
+    isSearchActive: Boolean = false,
+    isAdmin: Boolean = false,
+    onEdit: (DVBSResource) -> Unit = {},
+    onDelete: (DVBSResource) -> Unit = {}
+) {
+    var isExpanded by remember(isSearchActive) { mutableStateOf(isSearchActive) }
+
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isDarkMode) Color(0xFF1E1E1E) else Color.White
+        )
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { isExpanded = !isExpanded },
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = day.ifBlank { "Unspecified Day" },
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = contentColor
+                    )
+                    Text(
+                        text = "Total Entries: ${resources.size}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = contentColor.copy(alpha = 0.7f)
+                    )
+                }
+                Icon(
+                    imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = if (isExpanded) "Collapse" else "Expand",
+                    tint = contentColor
+                )
+            }
+
+            AnimatedVisibility(visible = isExpanded) {
+                Column(
+                    modifier = Modifier.padding(top = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    HorizontalDivider(color = contentColor.copy(alpha = 0.1f))
+                    resources.forEach { resource ->
+                        DVBSResourceItem(
+                            resource = resource,
+                            contentColor = contentColor,
+                            isAdmin = isAdmin,
+                            onEdit = { onEdit(resource) },
+                            onDelete = { onDelete(resource) }
+                        )
+                        if (resource != resources.last()) {
+                            HorizontalDivider(
+                                modifier = Modifier.padding(horizontal = 8.dp),
+                                color = contentColor.copy(alpha = 0.05f)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun DVBSResourceItem(
     resource: DVBSResource,
     contentColor: Color,
@@ -445,35 +555,34 @@ private fun DVBSResourceItem(
     onEdit: () -> Unit = {},
     onDelete: () -> Unit = {}
 ) {
-    Card(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text(resource.dvbsDay, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = contentColor)
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(resource.date, style = MaterialTheme.typography.labelSmall, color = contentColor.copy(alpha = 0.6f))
-                    if (isAdmin) {
-                        Spacer(modifier = Modifier.width(8.dp))
-                        IconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
-                            Icon(Icons.Default.Edit, contentDescription = "Edit", tint = Color.Gray, modifier = Modifier.size(18.dp))
-                        }
-                        IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
-                            Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.Red.copy(alpha = 0.7f), modifier = Modifier.size(18.dp))
-                        }
+    Column(modifier = Modifier.padding(horizontal = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Text("Grade: ${resource.grade}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = contentColor)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(resource.date, style = MaterialTheme.typography.labelSmall, color = contentColor.copy(alpha = 0.6f))
+                if (isAdmin) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    IconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.Default.Edit, contentDescription = "Edit", tint = Color.Gray, modifier = Modifier.size(18.dp))
+                    }
+                    IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.Red.copy(alpha = 0.7f), modifier = Modifier.size(18.dp))
                     }
                 }
             }
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Grade: ${resource.grade}", fontWeight = FontWeight.Medium)
-                Text("(${resource.genderCategory})", fontWeight = FontWeight.Medium, color = contentColor.copy(alpha = 0.7f))
-            }
-            Text("Teacher: ${resource.teacherName}")
-            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                StatItem("Children", resource.numChildren.toString())
-                StatItem("Salvations", resource.numNewSalvations.toString())
-                StatItem("Workers", resource.numWorkers.toString())
-            }
+        }
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Category: ${resource.genderCategory}", style = MaterialTheme.typography.bodyMedium, color = contentColor.copy(alpha = 0.7f))
+            Text("•", color = contentColor.copy(alpha = 0.5f))
+            Text("Teacher: ${resource.teacherName}", style = MaterialTheme.typography.bodyMedium, color = contentColor.copy(alpha = 0.7f))
+        }
+        
+        Spacer(modifier = Modifier.height(4.dp))
+        
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            StatItem("Children", resource.numChildren.toString())
+            StatItem("Salvations", resource.numNewSalvations.toString())
+            StatItem("Workers", resource.numWorkers.toString())
         }
     }
 }

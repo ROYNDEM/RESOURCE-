@@ -9,6 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material3.*
+import androidx.compose.material3.MenuAnchorType
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -31,7 +32,7 @@ fun DVBSRegistrationEntryScreen(
     dvbsViewModel: DVBSViewModel = viewModel(),
     onNavigateBack: () -> Unit,
     isDarkMode: Boolean = false,
-    registrationId: String? = null
+    registrationId: String? = null,
 ) {
     var childName by rememberSaveable { mutableStateOf("") }
     var ageString by rememberSaveable { mutableStateOf("") }
@@ -39,6 +40,12 @@ fun DVBSRegistrationEntryScreen(
     var parentGuardianName by rememberSaveable { mutableStateOf("") }
     var parentGuardianPhone by rememberSaveable { mutableStateOf("") }
     var selectedGender by rememberSaveable { mutableStateOf("Boy") }
+
+    // Metadata for preserving history when editing
+    var originalRegistrationDate by rememberSaveable { mutableStateOf<String?>(null) }
+    var originalRegisteredBy by rememberSaveable { mutableStateOf<String?>(null) }
+    var originalCreatedAt by remember { mutableStateOf<Date?>(null) }
+    var hasLoadedExisting by rememberSaveable { mutableStateOf(value = false) }
     
     // Auto-populate event date with today's date
     val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
@@ -52,22 +59,23 @@ fun DVBSRegistrationEntryScreen(
     var parentPhoneError by rememberSaveable { mutableStateOf<String?>(null) }
     var dvbsDayError by rememberSaveable { mutableStateOf<String?>(null) }
 
-    var gradeExpanded by remember { mutableStateOf(false) }
-    var nameSuggestionsExpanded by remember { mutableStateOf(false) }
+    var gradeExpanded by remember { mutableStateOf(value = false) }
+    var nameSuggestionsExpanded by remember { mutableStateOf(value = false) }
 
     val registrations by dvbsViewModel.dvbsRegistrations.collectAsState()
 
     val filteredSuggestions = remember(childName, registrations) {
         if (childName.length < 2) emptyList()
-        else registrations
+        else registrations.asSequence()
             .filter { it.childName.contains(childName, ignoreCase = true) }
             .distinctBy { it.childName.lowercase() }
             .take(5)
+            .toList()
     }
 
     // Pre-populate if editing
     LaunchedEffect(registrationId, registrations) {
-        if (registrationId != null) {
+        if ((registrationId != null) && !hasLoadedExisting) {
             val existing = registrations.find { it.id == registrationId }
             if (existing != null) {
                 childName = existing.childName
@@ -78,6 +86,12 @@ fun DVBSRegistrationEntryScreen(
                 eventDate = existing.eventDate
                 dvbsDay = existing.dvbsDay
                 selectedGender = existing.gender
+
+                // Store metadata
+                originalRegistrationDate = existing.registrationDate
+                originalRegisteredBy = existing.registeredBy
+                originalCreatedAt = existing.createdAt
+                hasLoadedExisting = true
             }
         }
     }
@@ -88,7 +102,7 @@ fun DVBSRegistrationEntryScreen(
 
     val gradeOptions = listOf(
         "Playgroup", "PP1", "PP2", "Grade 1", "Grade 2", "Grade 3",
-        "Grade 4", "Grade 5", "Grade 6", "Grade 7", "Grade 8"
+        "Grade 4", "Grade 5", "Grade 6", "Grade 7", "Grade 8",
     )
 
     fun validateFields(): Boolean {
@@ -107,12 +121,12 @@ fun DVBSRegistrationEntryScreen(
         }
         dvbsDayError = if (dvbsDay.isBlank()) "DVBS day cannot be empty" else null
 
-        return childNameError == null &&
-                ageError == null &&
-                gradeClassError == null &&
-                parentNameError == null &&
-                parentPhoneError == null &&
-                dvbsDayError == null
+        return ((childNameError == null) &&
+                (ageError == null) &&
+                (gradeClassError == null) &&
+                (parentNameError == null) &&
+                (parentPhoneError == null) &&
+                (dvbsDayError == null))
     }
 
     Scaffold(
@@ -127,7 +141,7 @@ fun DVBSRegistrationEntryScreen(
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
                     containerColor = primaryColor,
                     navigationIconContentColor = Color.White,
-                    titleContentColor = Color.White
+                    titleContentColor = Color.White,
                 )
             )
         },
@@ -157,20 +171,22 @@ fun DVBSRegistrationEntryScreen(
                     placeholder = { Text("e.g., John Doe") },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .menuAnchor(),
+                        .menuAnchor(type = MenuAnchorType.PrimaryEditable, enabled = true),
                     singleLine = true,
                     isError = childNameError != null,
                     shape = RoundedCornerShape(12.dp),
                     trailingIcon = {
                         if (childName.isNotEmpty()) {
-                            IconButton(onClick = {
-                                childName = ""
-                                ageString = ""
-                                gradeClass = ""
-                                parentGuardianName = ""
-                                parentGuardianPhone = ""
-                                selectedGender = "Boy"
-                            }) {
+                            IconButton(
+                                onClick = {
+                                    childName = ""
+                                    ageString = ""
+                                    gradeClass = ""
+                                    parentGuardianName = ""
+                                    parentGuardianPhone = ""
+                                    selectedGender = "Boy"
+                                }
+                            ) {
                                 Icon(Icons.Default.Clear, contentDescription = "Clear")
                             }
                         }
@@ -274,7 +290,7 @@ fun DVBSRegistrationEntryScreen(
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = gradeExpanded) },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .menuAnchor(),
+                        .menuAnchor(type = MenuAnchorType.PrimaryNotEditable, enabled = true),
                     isError = gradeClassError != null,
                     shape = RoundedCornerShape(12.dp)
                 )
@@ -398,9 +414,9 @@ fun DVBSRegistrationEntryScreen(
                             eventDate = eventDate,
                             dvbsDay = dvbsDay,
                             gender = selectedGender,
-                            registrationDate = if (registrationId == null) sdf.format(Date()) else eventDate, // Use existing if editing
-                            registeredBy = FirebaseAuth.getInstance().currentUser?.email ?: "Unknown",
-                            createdAt = Date()
+                            registrationDate = originalRegistrationDate ?: sdf.format(Date()),
+                            registeredBy = originalRegisteredBy ?: FirebaseAuth.getInstance().currentUser?.email ?: "Unknown",
+                            createdAt = originalCreatedAt ?: Date()
                         )
 
                         dvbsViewModel.addDVBSRegistration(newRegistration)

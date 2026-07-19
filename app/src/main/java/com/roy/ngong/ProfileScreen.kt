@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -105,7 +106,8 @@ fun ProfileScreen(navController: NavController) {
                     onClick = {
                         if (userId != null && nickname.isNotBlank()) {
                             val userProfile = mapOf("nickname" to nickname)
-                            firestore.collection("users").document(userId).set(userProfile)
+                            firestore.collection("users").document(userId)
+                                .set(userProfile, SetOptions.merge())
                                 .addOnSuccessListener {
                                     Toast.makeText(context, "Name Saved!", Toast.LENGTH_SHORT).show()
                                     isNameSaved = true // Switch to the "Welcome" view!

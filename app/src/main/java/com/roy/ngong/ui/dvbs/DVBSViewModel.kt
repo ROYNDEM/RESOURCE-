@@ -16,6 +16,10 @@ import android.util.Log
 class DVBSViewModel : ViewModel() {
     private val db = Firebase.firestore
 
+    private var recordsListener: com.google.firebase.firestore.ListenerRegistration? = null
+    private var resourcesListener: com.google.firebase.firestore.ListenerRegistration? = null
+    private var registrationsListener: com.google.firebase.firestore.ListenerRegistration? = null
+
     private val _dvbsRecords = MutableStateFlow<List<DVBSRecord>>(emptyList())
     val dvbsRecords: StateFlow<List<DVBSRecord>> = _dvbsRecords
 
@@ -29,74 +33,88 @@ class DVBSViewModel : ViewModel() {
     val dvbsStatistics: StateFlow<DVBSStatistics> = _dvbsStatistics
 
     init {
-        fetchDVBSRecords()
-        fetchDVBSResources()
-        fetchDVBSRegistrations()
+        startListening()
     }
 
-    fun fetchDVBSRecords() {
-        viewModelScope.launch {
-            try {
-                db.collection("dvbs_records")
-                    .orderBy("date", com.google.firebase.firestore.Query.Direction.DESCENDING)
-                    .get()
-                    .addOnSuccessListener { snapshot ->
-                        val records = snapshot.documents.mapNotNull { doc ->
-                            doc.toObject(DVBSRecord::class.java)
-                        }
-                        _dvbsRecords.value = records
-                        calculateStatistics(records)
-                    }
-                    .addOnFailureListener { e ->
-                        Log.e("DVBSViewModel", "Error fetching DVBS records", e)
-                    }
-            } catch (e: Exception) {
-                Log.e("DVBSViewModel", "Exception in fetchDVBSRecords", e)
-            }
-        }
+    fun startListening() {
+        listenForRecords()
+        listenForResources()
+        listenForRegistrations()
     }
 
-    fun fetchDVBSResources() {
-        viewModelScope.launch {
-            try {
-                db.collection("dvbs_resources")
-                    .orderBy("date", com.google.firebase.firestore.Query.Direction.DESCENDING)
-                    .get()
-                    .addOnSuccessListener { snapshot ->
-                        val resources = snapshot.documents.mapNotNull { doc ->
-                            doc.toObject(DVBSResource::class.java)
-                        }
-                        _dvbsResources.value = resources
-                    }
-                    .addOnFailureListener { e ->
-                        Log.e("DVBSViewModel", "Error fetching DVBS resources", e)
-                    }
-            } catch (e: Exception) {
-                Log.e("DVBSViewModel", "Exception in fetchDVBSResources", e)
-            }
-        }
+    fun stopListening() {
+        recordsListener?.remove()
+        resourcesListener?.remove()
+        registrationsListener?.remove()
+        recordsListener = null
+        resourcesListener = null
+        registrationsListener = null
     }
 
-    fun fetchDVBSRegistrations() {
-        viewModelScope.launch {
-            try {
-                db.collection("dvbs_registrations")
-                    .orderBy("registrationDate", com.google.firebase.firestore.Query.Direction.DESCENDING)
-                    .get()
-                    .addOnSuccessListener { snapshot ->
-                        val registrations = snapshot.documents.mapNotNull { doc ->
-                            doc.toObject(DVBSRegistration::class.java)
-                        }
-                        _dvbsRegistrations.value = registrations
+    private fun listenForRecords() {
+        recordsListener?.remove()
+        recordsListener = db.collection("dvbs_records")
+            .orderBy("date", com.google.firebase.firestore.Query.Direction.DESCENDING)
+            .addSnapshotListener { snapshot, e ->
+                if (e != null) {
+                    Log.e("DVBSViewModel", "Error listening for DVBS records", e)
+                    return@addSnapshotListener
+                }
+                if (snapshot != null) {
+                    val records = snapshot.documents.mapNotNull { doc ->
+                        doc.toObject(DVBSRecord::class.java)
                     }
-                    .addOnFailureListener { e ->
-                        Log.e("DVBSViewModel", "Error fetching DVBS registrations", e)
-                    }
-            } catch (e: Exception) {
-                Log.e("DVBSViewModel", "Exception in fetchDVBSRegistrations", e)
+                    _dvbsRecords.value = records
+                    calculateStatistics(records)
+                }
             }
-        }
     }
+
+    private fun listenForResources() {
+        resourcesListener?.remove()
+        resourcesListener = db.collection("dvbs_resources")
+            .orderBy("date", com.google.firebase.firestore.Query.Direction.DESCENDING)
+            .addSnapshotListener { snapshot, e ->
+                if (e != null) {
+                    Log.e("DVBSViewModel", "Error listening for DVBS resources", e)
+                    return@addSnapshotListener
+                }
+                if (snapshot != null) {
+                    val resources = snapshot.documents.mapNotNull { doc ->
+                        doc.toObject(DVBSResource::class.java)
+                    }
+                    _dvbsResources.value = resources
+                }
+            }
+    }
+
+    private fun listenForRegistrations() {
+        registrationsListener?.remove()
+        registrationsListener = db.collection("dvbs_registrations")
+            .orderBy("registrationDate", com.google.firebase.firestore.Query.Direction.DESCENDING)
+            .addSnapshotListener { snapshot, e ->
+                if (e != null) {
+                    Log.e("DVBSViewModel", "Error listening for DVBS registrations", e)
+                    return@addSnapshotListener
+                }
+                if (snapshot != null) {
+                    val registrations = snapshot.documents.mapNotNull { doc ->
+                        doc.toObject(DVBSRegistration::class.java)
+                    }
+                    _dvbsRegistrations.value = registrations
+                }
+            }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        stopListening()
+    }
+
+    // Keep old fetch methods for manual refresh if needed, but updated to use listeners internally or force refresh
+    fun fetchDVBSRecords() = listenForRecords()
+    fun fetchDVBSResources() = listenForResources()
+    fun fetchDVBSRegistrations() = listenForRegistrations()
 
     private fun calculateStatistics(records: List<DVBSRecord>) {
         if (records.isEmpty()) {
@@ -123,7 +141,6 @@ class DVBSViewModel : ViewModel() {
                     .set(record)
                     .addOnSuccessListener {
                         Log.d("DVBSViewModel", "Record added successfully")
-                        fetchDVBSRecords()
                     }
                     .addOnFailureListener { e ->
                         Log.e("DVBSViewModel", "Error adding DVBS record", e)
@@ -142,7 +159,6 @@ class DVBSViewModel : ViewModel() {
                     .set(resource)
                     .addOnSuccessListener {
                         Log.d("DVBSViewModel", "Resource added successfully")
-                        fetchDVBSResources()
                     }
                     .addOnFailureListener { e ->
                         Log.e("DVBSViewModel", "Error adding DVBS resource", e)
@@ -161,7 +177,6 @@ class DVBSViewModel : ViewModel() {
                     .set(registration)
                     .addOnSuccessListener {
                         Log.d("DVBSViewModel", "Registration added successfully")
-                        fetchDVBSRegistrations()
                     }
                     .addOnFailureListener { e ->
                         Log.e("DVBSViewModel", "Error adding DVBS registration", e)
@@ -178,7 +193,6 @@ class DVBSViewModel : ViewModel() {
                 db.collection("dvbs_resources").document(id).delete()
                     .addOnSuccessListener {
                         Log.d("DVBSViewModel", "Resource deleted successfully")
-                        fetchDVBSResources()
                     }
                     .addOnFailureListener { e ->
                         Log.e("DVBSViewModel", "Error deleting DVBS resource", e)
@@ -195,7 +209,6 @@ class DVBSViewModel : ViewModel() {
                 db.collection("dvbs_registrations").document(id).delete()
                     .addOnSuccessListener {
                         Log.d("DVBSViewModel", "Registration deleted successfully")
-                        fetchDVBSRegistrations()
                     }
                     .addOnFailureListener { e ->
                         Log.e("DVBSViewModel", "Error deleting DVBS registration", e)

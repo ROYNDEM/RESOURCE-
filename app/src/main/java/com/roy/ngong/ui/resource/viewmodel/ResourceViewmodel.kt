@@ -43,8 +43,7 @@ class ResourceViewModel : ViewModel() {
     }
 
     fun startListeningForLogs() {
-        if (logsListener != null) return
-
+        logsListener?.remove()
         logsListener = db.collection("class_session_logs")
             .orderBy("sessionDate", Query.Direction.DESCENDING)
             .addSnapshotListener { snapshots, error ->
@@ -63,8 +62,7 @@ class ResourceViewModel : ViewModel() {
     }
 
     fun startListeningForInventory() {
-        if (inventoryListener != null) return
-
+        inventoryListener?.remove()
         inventoryListener = db.collection("sunday_inventory")
             .orderBy("date", Query.Direction.DESCENDING)
             .addSnapshotListener { snapshots, error ->
@@ -77,6 +75,11 @@ class ResourceViewModel : ViewModel() {
                     _inventoryRecords.value = snapshots.toObjects(SundayResourceInventory::class.java)
                 }
             }
+    }
+
+    fun refreshAll() {
+        startListeningForLogs()
+        startListeningForInventory()
     }
 
     private fun processLogsByDate(logs: List<ClassSessionLog>) {

@@ -22,6 +22,10 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Inventory
@@ -51,6 +55,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -260,12 +265,30 @@ fun AdminManageControlsScreen(
     val generalData by appDataViewModel.generalData.collectAsState()
     var verseText by remember(generalData.verseOfTheDay) { mutableStateOf(generalData.verseOfTheDay) }
     var announcementText by remember(generalData.announcement) { mutableStateOf(generalData.announcement) }
+    var isRefreshing by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Manage App Controls") },
-                navigationIcon = { IconButton(onClick = onNavigateBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } }
+                navigationIcon = { IconButton(onClick = onNavigateBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
+                actions = {
+                    if (isRefreshing) {
+                        CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White, strokeWidth = 2.dp)
+                    } else {
+                        IconButton(onClick = {
+                            scope.launch {
+                                isRefreshing = true
+                                // Trigger re-sync logic if possible, or just wait to simulate
+                                delay(1000)
+                                isRefreshing = false
+                            }
+                        }) {
+                            Icon(Icons.Default.Refresh, "Refresh")
+                        }
+                    }
+                }
             )
         }
     ) { paddingValues ->
@@ -310,6 +333,18 @@ fun AdminReportsListScreen(
     resourceViewModel: ResourceViewModel,
     onNavigateBack: () -> Unit
 ) {
+    val scope = rememberCoroutineScope()
+    var isRefreshing by remember { mutableStateOf(false) }
+
+    val onRefresh = {
+        scope.launch {
+            isRefreshing = true
+            resourceViewModel.startListeningForLogs()
+            delay(1000)
+            isRefreshing = false
+        }
+    }
+
     LaunchedEffect(Unit) {
         resourceViewModel.startListeningForLogs()
     }
@@ -323,38 +358,47 @@ fun AdminReportsListScreen(
                 title = { Text("Resource Reports by Date") },
                 navigationIcon = { IconButton(onClick = onNavigateBack) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
-                } }
+                } },
+                actions = {
+                    IconButton(onClick = { onRefresh() }) {
+                        Icon(Icons.Default.Refresh, "Refresh")
+                    }
+                }
             )
         }
     ) { paddingValues ->
-        LazyColumn(
-            modifier = Modifier
-                .padding(paddingValues)
-                .fillMaxSize(),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = { onRefresh() },
+            modifier = Modifier.padding(paddingValues).fillMaxSize()
         ) {
-            if (dateTotals.isEmpty()){
-                item {
-                    Box(modifier = Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center){
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            CircularProgressIndicator()
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text("Loading reports...")
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                if (dateTotals.isEmpty()){
+                    item {
+                        Box(modifier = Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center){
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                CircularProgressIndicator()
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text("Loading reports...")
+                            }
                         }
                     }
-                }
-            } else {
-                items(sortedDates, key = { it }) { dateString ->
-                    val total = dateTotals[dateString] ?: 0
-                    ReportDateCard(
-                        dateString = dateString,
-                        totalAttendees = total,
-                        onClick = {
-                            resourceViewModel.loadReportForDate(dateString)
-                            navController.navigate(AppDestinations.reportDetailRoute(dateString))
-                        }
-                    )
+                } else {
+                    items(sortedDates, key = { it }) { dateString ->
+                        val total = dateTotals[dateString] ?: 0
+                        ReportDateCard(
+                            dateString = dateString,
+                            totalAttendees = total,
+                            onClick = {
+                                resourceViewModel.loadReportForDate(dateString)
+                                navController.navigate(AppDestinations.reportDetailRoute(dateString))
+                            }
+                        )
+                    }
                 }
             }
         }

@@ -40,6 +40,9 @@ import com.roy.ngong.ui.dvbs.DVBSScreen
 import com.roy.ngong.ui.dvbs.DVBSViewModel
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 
@@ -71,6 +74,21 @@ fun HomeScreen(
     // Observe User Role and Admin Status from AuthViewModel
     val userRole by authViewModel.userRole.collectAsState()
     val isAdmin by authViewModel.isAdmin.collectAsState()
+
+    var isRefreshing by remember { mutableStateOf(false) }
+    val dvbsViewModel: DVBSViewModel = viewModel()
+
+    val onRefresh = {
+        scope.launch {
+            isRefreshing = true
+            dvbsViewModel.startListening()
+            // appDataViewModel listener is automatic, but we can't easily "force" it without more complex logic
+            // or re-initializing the ViewModel, but snapshot listeners are usually fine.
+            delay(1000)
+            isRefreshing = false
+        }
+        Unit // Return Unit to satisfy type requirements
+    }
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -112,7 +130,6 @@ fun HomeScreen(
     ) {
         val data by appDataViewModel.generalData.collectAsState()
         val pagerState = rememberPagerState(pageCount = { 2 })
-        val dvbsViewModel: DVBSViewModel = viewModel()
 
         Scaffold(
             topBar = {
@@ -122,7 +139,8 @@ fun HomeScreen(
                     onMenuClick = { scope.launch { drawerState.open() } },
                     onProfileClick = onProfileClick,
                     onThemeToggle = onThemeToggle,
-                    onLogoutClick = onLogout
+                    onLogoutClick = onLogout,
+                    onRefreshClick = onRefresh
                 )
             },
             floatingActionButton = {
@@ -141,60 +159,64 @@ fun HomeScreen(
             },
             containerColor = if (isDarkMode) darkModeBackground else lightModeBackground
         ) { paddingValues ->
-            HorizontalPager(
-                state = pagerState,
-                modifier = Modifier
-                    .padding(paddingValues)
-                    .fillMaxSize()
-            ) { page ->
-                when (page) {
-                    0 -> {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(16.dp)
-                                .verticalScroll(rememberScrollState()),
-                            verticalArrangement = Arrangement.spacedBy(20.dp)
-                        ) {
-                            InfoCard(
-                                title = "Verse of the Day",
-                                content = data.verseOfTheDay,
-                                icon = Icons.Default.Book,
-                                isDarkMode = isDarkMode,
-                                surfaceColor = if (isDarkMode) darkModeSurface else lightModeSurface
-                            )
-
-                            InfoCard(
-                                title = "Announcements",
-                                content = data.announcement,
-                                icon = Icons.Default.Campaign,
-                                isDarkMode = isDarkMode,
-                                surfaceColor = if (isDarkMode) darkModeSurface else lightModeSurface
-                            )
-
-                            Box(
+            PullToRefreshBox(
+                isRefreshing = isRefreshing,
+                onRefresh = onRefresh,
+                modifier = Modifier.padding(paddingValues)
+            ) {
+                HorizontalPager(
+                    state = pagerState,
+                    modifier = Modifier.fillMaxSize()
+                ) { page ->
+                    when (page) {
+                        0 -> {
+                            Column(
                                 modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 16.dp),
-                                contentAlignment = Alignment.Center
+                                    .fillMaxSize()
+                                    .padding(16.dp)
+                                    .verticalScroll(rememberScrollState()),
+                                verticalArrangement = Arrangement.spacedBy(20.dp)
                             ) {
-                                Text(
-                                    text = "← Swipe left for DVBS →",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = if (isDarkMode) Color.White.copy(alpha = 0.5f) 
-                                           else Color.Black.copy(alpha = 0.5f)
+                                InfoCard(
+                                    title = "Verse of the Day",
+                                    content = data.verseOfTheDay,
+                                    icon = Icons.Default.Book,
+                                    isDarkMode = isDarkMode,
+                                    surfaceColor = if (isDarkMode) darkModeSurface else lightModeSurface
                                 )
+
+                                InfoCard(
+                                    title = "Announcements",
+                                    content = data.announcement,
+                                    icon = Icons.Default.Campaign,
+                                    isDarkMode = isDarkMode,
+                                    surfaceColor = if (isDarkMode) darkModeSurface else lightModeSurface
+                                )
+
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 16.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "← Swipe left for DVBS →",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = if (isDarkMode) Color.White.copy(alpha = 0.5f) 
+                                               else Color.Black.copy(alpha = 0.5f)
+                                    )
+                                }
                             }
                         }
-                    }
-                    1 -> {
-                        DVBSScreen(
-                            dvbsViewModel = dvbsViewModel,
-                            isDarkMode = isDarkMode,
-                            userRole = userRole,
-                            onNavigateToResourceEntry = onNavigateToDVBSResourceEntry,
-                            onNavigateToRegistrationEntry = onNavigateToDVBSRegistrationEntry
-                        )
+                        1 -> {
+                            DVBSScreen(
+                                dvbsViewModel = dvbsViewModel,
+                                isDarkMode = isDarkMode,
+                                userRole = userRole,
+                                onNavigateToResourceEntry = onNavigateToDVBSResourceEntry,
+                                onNavigateToRegistrationEntry = onNavigateToDVBSRegistrationEntry
+                            )
+                        }
                     }
                 }
             }
@@ -211,7 +233,8 @@ private fun HomeTopAppBar(
     onMenuClick: () -> Unit,
     onProfileClick: () -> Unit,
     onThemeToggle: () -> Unit,
-    onLogoutClick: () -> Unit
+    onLogoutClick: () -> Unit,
+    onRefreshClick: () -> Unit
 ) {
     var settingsExpanded by remember { mutableStateOf(false) }
 
@@ -240,6 +263,9 @@ private fun HomeTopAppBar(
             }
         },
         actions = {
+            IconButton(onClick = onRefreshClick) {
+                Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = Color.White)
+            }
             Box {
                 IconButton(onClick = { settingsExpanded = true }) {
                     Icon(
