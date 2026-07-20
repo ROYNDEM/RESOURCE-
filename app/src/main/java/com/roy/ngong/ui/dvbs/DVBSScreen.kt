@@ -35,10 +35,16 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.roy.ngong.data.DVBSRegistration
 import com.roy.ngong.data.DVBSResource
 
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import android.content.Context
+import android.content.Intent
+import androidx.core.content.FileProvider
+import java.io.File
+import java.io.FileOutputStream
 
 enum class DVBSViewMode {
     RESOURCES, REGISTRATIONS
@@ -137,6 +143,18 @@ fun DVBSScreen(
                 )
                 IconButton(onClick = { onRefresh() }) {
                     Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = primaryColor)
+                }
+                if (userRole == "admin") {
+                    val context = androidx.compose.ui.platform.LocalContext.current
+                    IconButton(onClick = {
+                        if (effectiveMode == DVBSViewMode.REGISTRATIONS) {
+                            exportRegistrationsToCSV(context, registrations)
+                        } else {
+                            exportResourcesToCSV(context, resources)
+                        }
+                    }) {
+                        Icon(Icons.Default.Download, contentDescription = "Download CSV", tint = primaryColor)
+                    }
                 }
             }
 
@@ -317,6 +335,39 @@ fun DVBSScreen(
                 }
             }
         )
+    }
+}
+
+private fun exportRegistrationsToCSV(context: Context, registrations: List<DVBSRegistration>) {
+    val csvHeader = "Child Name,Age,Gender,Grade,Parent Name,Parent Phone,Event Date,DVBS Day,Registration Date,Registered By\n"
+    val csvData = registrations.joinToString("\n") { r ->
+        "${r.childName},${r.age},${r.gender},${r.gradeClass},${r.parentGuardianName},${r.parentGuardianPhone},${r.eventDate},${r.dvbsDay},${r.registrationDate},${r.registeredBy}"
+    }
+    shareFile(context, "dvbs_registrations.csv", csvHeader + csvData)
+}
+
+private fun exportResourcesToCSV(context: Context, resources: List<DVBSResource>) {
+    val csvHeader = "Date,Day,Grade,Teacher,Children,Salvations,Workers,Category,Recorded By\n"
+    val csvData = resources.joinToString("\n") { r ->
+        "${r.date},${r.dvbsDay},${r.grade},${r.teacherName},${r.numChildren},${r.numNewSalvations},${r.numWorkers},${r.genderCategory},${r.recordedBy}"
+    }
+    shareFile(context, "dvbs_resources.csv", csvHeader + csvData)
+}
+
+private fun shareFile(context: Context, fileName: String, content: String) {
+    try {
+        val file = File(context.cacheDir, fileName)
+        FileOutputStream(file).use { it.write(content.toByteArray()) }
+
+        val uri = FileProvider.getUriForFile(context, "com.roy.ngong.fileprovider", file)
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/csv"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        context.startActivity(Intent.createChooser(intent, "Export $fileName"))
+    } catch (e: Exception) {
+        android.util.Log.e("DVBSScreen", "Error exporting CSV", e)
     }
 }
 

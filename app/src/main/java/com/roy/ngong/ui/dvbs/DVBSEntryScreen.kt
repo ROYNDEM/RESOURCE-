@@ -26,6 +26,25 @@ fun DVBSEntryScreen(
     resourceId: String? = null
 ) {
     var dvbsDay by remember { mutableStateOf("") }
+    var isUserSetDay by remember { mutableStateOf(false) }
+
+    fun calculateDvbsDay(dateStr: String): String {
+        return try {
+            val parts = dateStr.split("-")
+            if (parts.size == 3) {
+                val day = parts[2].toInt()
+                when (day) {
+                    10 -> "Day 1"
+                    11 -> "Day 2"
+                    12 -> "Day 3"
+                    13 -> "Day 4"
+                    14 -> "Day 5"
+                    else -> ""
+                }
+            } else ""
+        } catch (e: Exception) { "" }
+    }
+
     var teacherName by remember { mutableStateOf("") }
     var numChildren by remember { mutableStateOf("") }
     var numNewSalvations by remember { mutableStateOf("") }
@@ -39,8 +58,18 @@ fun DVBSEntryScreen(
     val gradeBases = listOf("Playgroup", "PP1", "PP2") + (1..8).map { "Grade $it" }
     val streams = listOf("A", "B", "C", "D")
     val genderCategories = listOf("Mixed", "Boys", "Girls")
-    
+
     var selectedDate by remember { mutableStateOf(getCurrentDate()) }
+
+    // Auto-populate DVBS Day when selectedDate changes, unless user manually set it
+    LaunchedEffect(selectedDate) {
+        if (!isUserSetDay || dvbsDay.isBlank()) {
+            val autoDay = calculateDvbsDay(selectedDate)
+            if (autoDay.isNotBlank()) {
+                dvbsDay = autoDay
+            }
+        }
+    }
 
     val resources by dvbsViewModel.dvbsResources.collectAsState()
 
@@ -101,7 +130,10 @@ fun DVBSEntryScreen(
 
             OutlinedTextField(
                 value = dvbsDay,
-                onValueChange = { dvbsDay = it },
+                onValueChange = { 
+                    dvbsDay = it
+                    isUserSetDay = true
+                },
                 label = { Text("DVBS Day (e.g., Day 1)") },
                 modifier = Modifier.fillMaxWidth()
             )

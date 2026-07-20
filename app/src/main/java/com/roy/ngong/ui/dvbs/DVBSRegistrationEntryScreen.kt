@@ -51,6 +51,34 @@ fun DVBSRegistrationEntryScreen(
     val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
     var eventDate by rememberSaveable { mutableStateOf(sdf.format(Date())) }
     var dvbsDay by rememberSaveable { mutableStateOf("") }
+    var isUserSetDay by rememberSaveable { mutableStateOf(false) }
+
+    fun calculateDvbsDay(dateStr: String): String {
+        return try {
+            val parts = dateStr.split("-")
+            if (parts.size == 3) {
+                val day = parts[2].toInt()
+                when (day) {
+                    10 -> "Day 1"
+                    11 -> "Day 2"
+                    12 -> "Day 3"
+                    13 -> "Day 4"
+                    14 -> "Day 5"
+                    else -> ""
+                }
+            } else ""
+        } catch (e: Exception) { "" }
+    }
+
+    // Auto-populate DVBS Day when eventDate changes, unless user manually set it
+    LaunchedEffect(eventDate) {
+        if (!isUserSetDay || dvbsDay.isBlank()) {
+            val autoDay = calculateDvbsDay(eventDate)
+            if (autoDay.isNotBlank()) {
+                dvbsDay = autoDay
+            }
+        }
+    }
 
     var childNameError by rememberSaveable { mutableStateOf<String?>(null) }
     var ageError by rememberSaveable { mutableStateOf<String?>(null) }
@@ -382,6 +410,7 @@ fun DVBSRegistrationEntryScreen(
                 onValueChange = {
                     dvbsDay = it
                     dvbsDayError = null
+                    isUserSetDay = true
                 },
                 label = { Text("DVBS Day") },
                 placeholder = { Text("e.g., Day 1 or Monday") },
