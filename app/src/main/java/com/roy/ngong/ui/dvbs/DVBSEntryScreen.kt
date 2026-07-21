@@ -29,20 +29,14 @@ fun DVBSEntryScreen(
     var isUserSetDay by remember { mutableStateOf(false) }
 
     fun calculateDvbsDay(dateStr: String): String {
-        return try {
-            val parts = dateStr.split("-")
-            if (parts.size == 3) {
-                val day = parts[2].toInt()
-                when (day) {
-                    10 -> "Day 1"
-                    11 -> "Day 2"
-                    12 -> "Day 3"
-                    13 -> "Day 4"
-                    14 -> "Day 5"
-                    else -> ""
-                }
-            } else ""
-        } catch (e: Exception) { "" }
+        return when (dateStr) {
+            "2026-08-10" -> "Day 1"
+            "2026-08-11" -> "Day 2"
+            "2026-08-12" -> "Day 3"
+            "2026-08-13" -> "Day 4"
+            "2026-08-14" -> "Day 5"
+            else -> ""
+        }
     }
 
     var teacherName by remember { mutableStateOf("") }
