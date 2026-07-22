@@ -1,29 +1,32 @@
 package com.roy.ngong.ui.home
 
-import android.util.Log
 import android.widget.Toast
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
-import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.automirrored.filled.NoteAdd
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -41,7 +44,6 @@ import com.roy.ngong.ui.dvbs.DVBSViewModel
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -66,6 +68,7 @@ fun HomeScreen(
     val darkModeBackground = Color.Black
     val lightModeSurface = Color.White
     val darkModeSurface = Color(0xFF212121)
+    val drawerBackground = if (isDarkMode) darkModeSurface else lightModeBackground
 
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
@@ -95,6 +98,8 @@ fun HomeScreen(
         drawerContent = {
             AppDrawerContent(
                 primaryColor = primaryColor,
+                drawerBackground = drawerBackground,
+                isDarkMode = isDarkMode,
                 userRole = userRole,
                 isAdmin = isAdmin,
                 onAdminClick = {
@@ -133,18 +138,30 @@ fun HomeScreen(
 
         Scaffold(
             topBar = {
-                HomeTopAppBar(
-                    primaryColor = primaryColor,
-                    isDarkMode = isDarkMode,
-                    onMenuClick = { scope.launch { drawerState.open() } },
-                    onProfileClick = onProfileClick,
-                    onThemeToggle = onThemeToggle,
-                    onLogoutClick = onLogout,
-                    onRefreshClick = onRefresh
-                )
+                Column {
+                    HomeTopAppBar(
+                        primaryColor = primaryColor,
+                        isDarkMode = isDarkMode,
+                        onMenuClick = { scope.launch { drawerState.open() } },
+                        onProfileClick = onProfileClick,
+                        onThemeToggle = onThemeToggle,
+                        onLogoutClick = onLogout,
+                        onRefreshClick = onRefresh
+                    )
+                    PagerIndicator(
+                        pageCount = pagerState.pageCount,
+                        currentPage = pagerState.currentPage,
+                        selectedColor = primaryColor,
+                        unselectedColor = if (isDarkMode) Color.White.copy(alpha = 0.3f) else Color.Black.copy(alpha = 0.2f)
+                    )
+                }
             },
             floatingActionButton = {
-                if (pagerState.currentPage == 0) {
+                AnimatedVisibility(
+                    visible = pagerState.currentPage == 0,
+                    enter = scaleIn() + fadeIn(),
+                    exit = scaleOut() + fadeOut()
+                ) {
                     FloatingActionButton(
                         onClick = { navController.navigate(AppDestinations.RESOURCE_ENTRY_ROUTE) },
                         containerColor = primaryColor
@@ -202,8 +219,8 @@ fun HomeScreen(
                                     Text(
                                         text = "← Swipe left for DVBS →",
                                         style = MaterialTheme.typography.labelSmall,
-                                        color = if (isDarkMode) Color.White.copy(alpha = 0.5f) 
-                                               else Color.Black.copy(alpha = 0.5f)
+                                        color = if (isDarkMode) Color.White.copy(alpha = 0.5f)
+                                        else Color.Black.copy(alpha = 0.5f)
                                     )
                                 }
                             }
@@ -220,6 +237,36 @@ fun HomeScreen(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun PagerIndicator(
+    pageCount: Int,
+    currentPage: Int,
+    selectedColor: Color,
+    unselectedColor: Color
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        repeat(pageCount) { index ->
+            val selected = currentPage == index
+            val size by animateFloatAsState(targetValue = if (selected) 9f else 7f, label = "dotSize")
+            Box(
+                modifier = Modifier
+                    .padding(horizontal = 4.dp)
+                    .size(size.dp)
+                    .background(
+                        color = if (selected) selectedColor else unselectedColor,
+                        shape = CircleShape
+                    )
+            )
         }
     }
 }
@@ -318,6 +365,8 @@ private fun HomeTopAppBar(
 @Composable
 private fun AppDrawerContent(
     primaryColor: Color,
+    drawerBackground: Color,
+    isDarkMode: Boolean,
     userRole: String,
     isAdmin: Boolean,
     onAdminClick: () -> Unit,
@@ -327,8 +376,12 @@ private fun AppDrawerContent(
     onDVBSRegistrationsClick: () -> Unit,
     onDVBSResourcesClick: () -> Unit
 ) {
+    val contentColor = if (isDarkMode) Color.White else Color.Black
+    val buttonSurface = if (isDarkMode) Color(0xFF2C2C2C) else Color.White
+    val subButtonSurface = if (isDarkMode) Color(0xFF3A3A3A) else Color(0xFFF5F5F5)
+
     ModalDrawerSheet(
-        drawerContainerColor = Color(0xFFF0F0F0)
+        drawerContainerColor = drawerBackground
     ) {
         Box(
             modifier = Modifier
@@ -374,18 +427,24 @@ private fun AppDrawerContent(
             DrawerButton(
                 text = "Add New Entry",
                 icon = Icons.AutoMirrored.Filled.NoteAdd,
+                surfaceColor = buttonSurface,
+                contentColor = contentColor,
                 onClick = onEntryClick
             )
 
             DrawerButton(
                 text = "Event Calendar",
                 icon = Icons.Default.CalendarMonth,
+                surfaceColor = buttonSurface,
+                contentColor = contentColor,
                 onClick = onCalendarClick
             )
 
             DrawerButton(
                 text = "Review Pending Entries",
                 icon = Icons.Default.Edit,
+                surfaceColor = buttonSurface,
+                contentColor = contentColor,
                 onClick = onPendingClick
             )
 
@@ -394,6 +453,9 @@ private fun AppDrawerContent(
             // Only show DVBS management menu to Admins
             if (isAdmin || userRole == "admin") {
                 DVBSCollapsibleMenu(
+                    buttonSurface = buttonSurface,
+                    subButtonSurface = subButtonSurface,
+                    contentColor = contentColor,
                     onDVBSRegistrationsClick = onDVBSRegistrationsClick,
                     onDVBSResourcesClick = onDVBSResourcesClick
                 )
@@ -405,6 +467,8 @@ private fun AppDrawerContent(
                 DrawerButton(
                     text = "Admin Dashboard",
                     icon = Icons.Default.AdminPanelSettings,
+                    surfaceColor = buttonSurface,
+                    contentColor = contentColor,
                     onClick = onAdminClick
                 )
             }
@@ -414,17 +478,21 @@ private fun AppDrawerContent(
 
 @Composable
 private fun DVBSCollapsibleMenu(
+    buttonSurface: Color,
+    subButtonSurface: Color,
+    contentColor: Color,
     onDVBSRegistrationsClick: () -> Unit,
     onDVBSResourcesClick: () -> Unit
 ) {
     var isExpanded by remember { mutableStateOf(false) }
+    val chevronRotation by animateFloatAsState(targetValue = if (isExpanded) 180f else 0f, label = "chevronRotation")
 
     Column(modifier = Modifier.fillMaxWidth()) {
         Button(
             onClick = { isExpanded = !isExpanded },
             shape = RoundedCornerShape(16.dp),
             elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
+            colors = ButtonDefaults.buttonColors(containerColor = buttonSurface, contentColor = contentColor),
             modifier = Modifier.fillMaxWidth(),
             contentPadding = PaddingValues(16.dp)
         ) {
@@ -438,39 +506,52 @@ private fun DVBSCollapsibleMenu(
                 Text("DVBS", style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium))
                 Spacer(modifier = Modifier.weight(1f))
                 Icon(
-                    imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                    contentDescription = "Toggle"
+                    imageVector = Icons.Default.ExpandMore,
+                    contentDescription = "Toggle",
+                    modifier = Modifier.rotate(chevronRotation)
                 )
             }
         }
 
-        if (isExpanded) {
-            Spacer(modifier = Modifier.height(8.dp))
+        AnimatedVisibility(visible = isExpanded) {
+            Column {
+                Spacer(modifier = Modifier.height(8.dp))
 
-            DVBSDrawerSubButton(
-                text = "Registrations",
-                icon = Icons.Default.Person,
-                onClick = onDVBSRegistrationsClick
-            )
+                DVBSDrawerSubButton(
+                    text = "Registrations",
+                    icon = Icons.Default.Person,
+                    surfaceColor = subButtonSurface,
+                    contentColor = contentColor,
+                    onClick = onDVBSRegistrationsClick
+                )
 
-            Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(6.dp))
 
-            DVBSDrawerSubButton(
-                text = "Resources",
-                icon = Icons.Default.Build,
-                onClick = onDVBSResourcesClick
-            )
+                DVBSDrawerSubButton(
+                    text = "Resources",
+                    icon = Icons.Default.Build,
+                    surfaceColor = subButtonSurface,
+                    contentColor = contentColor,
+                    onClick = onDVBSResourcesClick
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun DVBSDrawerSubButton(text: String, icon: androidx.compose.ui.graphics.vector.ImageVector, onClick: () -> Unit) {
+private fun DVBSDrawerSubButton(
+    text: String,
+    icon: ImageVector,
+    surfaceColor: Color,
+    contentColor: Color,
+    onClick: () -> Unit
+) {
     Button(
         onClick = onClick,
         shape = RoundedCornerShape(12.dp),
         elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF5F5F5), contentColor = Color.Black),
+        colors = ButtonDefaults.buttonColors(containerColor = surfaceColor, contentColor = contentColor),
         modifier = Modifier.fillMaxWidth().padding(start = 16.dp),
         contentPadding = PaddingValues(12.dp)
     ) {
@@ -483,12 +564,18 @@ private fun DVBSDrawerSubButton(text: String, icon: androidx.compose.ui.graphics
 }
 
 @Composable
-private fun DrawerButton(text: String, icon: androidx.compose.ui.graphics.vector.ImageVector, onClick: () -> Unit) {
+private fun DrawerButton(
+    text: String,
+    icon: ImageVector,
+    surfaceColor: Color,
+    contentColor: Color,
+    onClick: () -> Unit
+) {
     Button(
         onClick = onClick,
         shape = RoundedCornerShape(16.dp),
         elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
+        colors = ButtonDefaults.buttonColors(containerColor = surfaceColor, contentColor = contentColor),
         modifier = Modifier.fillMaxWidth(),
         contentPadding = PaddingValues(16.dp)
     ) {
@@ -500,25 +587,68 @@ private fun DrawerButton(text: String, icon: androidx.compose.ui.graphics.vector
     }
 }
 
+/**
+ * Card that expands in place to reveal full content instead of a
+ * clickable surface that did nothing. Chevron rotates to signal state.
+ */
 @Composable
-private fun InfoCard(title: String, content: String, icon: androidx.compose.ui.graphics.vector.ImageVector, isDarkMode: Boolean, surfaceColor: Color) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val isPressed by interactionSource.collectIsPressedAsState()
-    val scale by animateFloatAsState(targetValue = if (isPressed) 0.98f else 1f, label = "cardScale")
+private fun InfoCard(
+    title: String,
+    content: String,
+    icon: ImageVector,
+    isDarkMode: Boolean,
+    surfaceColor: Color
+) {
+    var expanded by remember { mutableStateOf(false) }
     val contentColor = if (isDarkMode) Color.White else Color.Black
+    val chevronRotation by animateFloatAsState(targetValue = if (expanded) 180f else 0f, label = "infoCardChevron")
 
     Card(
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = surfaceColor),
-        modifier = Modifier.fillMaxWidth().scale(scale).shadow(elevation = if (isPressed) 4.dp else 12.dp, shape = RoundedCornerShape(24.dp)).clickable(interactionSource = interactionSource, indication = null, onClick = {})
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { expanded = !expanded }
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(icon, contentDescription = title, modifier = Modifier.size(36.dp), tint = contentColor)
-                Text(text = title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold, color = contentColor)
+                Spacer(modifier = Modifier.width(16.dp))
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = contentColor,
+                    modifier = Modifier.weight(1f)
+                )
+                Icon(
+                    imageVector = Icons.Default.ExpandMore,
+                    contentDescription = if (expanded) "Collapse" else "Expand",
+                    tint = contentColor,
+                    modifier = Modifier.rotate(chevronRotation)
+                )
             }
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(text = content, style = MaterialTheme.typography.bodyLarge, color = contentColor.copy(alpha = 0.8f))
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Text(
+                text = content,
+                style = MaterialTheme.typography.bodyLarge,
+                color = contentColor.copy(alpha = 0.8f),
+                maxLines = if (expanded) Int.MAX_VALUE else 2,
+                overflow = if (expanded) androidx.compose.ui.text.style.TextOverflow.Clip
+                else androidx.compose.ui.text.style.TextOverflow.Ellipsis
+            )
+
+            AnimatedVisibility(visible = !expanded && content.length > 80) {
+                Text(
+                    text = "Tap to read more",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = contentColor.copy(alpha = 0.5f),
+                    modifier = Modifier.padding(top = 6.dp)
+                )
+            }
         }
     }
 }
