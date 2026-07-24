@@ -1,11 +1,21 @@
 package com.roy.ngong.ui.dvbs
 
 import androidx.compose.animation.*
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -22,12 +32,17 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -45,6 +60,7 @@ import android.content.Intent
 import androidx.core.content.FileProvider
 import java.io.File
 import java.io.FileOutputStream
+import com.google.firebase.auth.FirebaseAuth
 
 enum class DVBSViewMode {
     RESOURCES, REGISTRATIONS
@@ -70,8 +86,21 @@ fun DVBSScreen(
 
     var fabExpanded by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
+    var selectedDayFilter by remember { mutableStateOf<String?>(null) }
     var isRefreshing by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+
+    // --- INITIAL LOADING SKELETON ---
+    var isInitialLoading by remember { mutableStateOf(true) }
+    LaunchedEffect(registrations, resources) {
+        if (registrations.isNotEmpty() || resources.isNotEmpty()) {
+            isInitialLoading = false
+        }
+    }
+    LaunchedEffect(Unit) {
+        delay(2500)
+        isInitialLoading = false
+    }
 
     val onRefresh = {
         scope.launch {
@@ -82,11 +111,6 @@ fun DVBSScreen(
         }
     }
 
-    // State for delete confirmation
-    var showDeleteDialog by remember { mutableStateOf(false) }
-    var itemToDeleteId by remember { mutableStateOf<String?>(null) }
-    var isDeletingRegistration by remember { mutableStateOf(true) }
-
     // Determine the view mode if not explicitly set (for the swipeable page)
     val effectiveMode = when {
         userRole == "registration" -> DVBSViewMode.REGISTRATIONS
@@ -94,23 +118,34 @@ fun DVBSScreen(
         else -> mode // Admin sees whatever mode is passed (default registrations)
     }
 
-    // --- FILTERING LOGIC ---
-    val filteredRegistrations = remember(registrations, searchQuery) {
-        if (searchQuery.isBlank()) registrations
-        else registrations.filter {
-            it.childName.contains(searchQuery, ignoreCase = true) ||
-            it.parentGuardianName.contains(searchQuery, ignoreCase = true) ||
-            it.gradeClass.contains(searchQuery, ignoreCase = true) ||
-            it.dvbsDay.contains(searchQuery, ignoreCase = true)
+    // --- DAY FILTER OPTIONS ---
+    val availableDays = remember(registrations, resources, effectiveMode) {
+        if (effectiveMode == DVBSViewMode.REGISTRATIONS) {
+            registrations.map { it.dvbsDay }.distinct().sorted()
+        } else {
+            resources.map { it.dvbsDay }.distinct().sorted()
         }
     }
 
-    val filteredResources = remember(resources, searchQuery) {
-        if (searchQuery.isBlank()) resources
-        else resources.filter {
-            it.teacherName.contains(searchQuery, ignoreCase = true) ||
-            it.grade.contains(searchQuery, ignoreCase = true) ||
-            it.dvbsDay.contains(searchQuery, ignoreCase = true)
+    // --- FILTERING LOGIC ---
+    val filteredRegistrations = remember(registrations, searchQuery, selectedDayFilter) {
+        registrations.filter { r ->
+            (selectedDayFilter == null || r.dvbsDay == selectedDayFilter) &&
+                    (searchQuery.isBlank() ||
+                            r.childName.contains(searchQuery, ignoreCase = true) ||
+                            r.parentGuardianName.contains(searchQuery, ignoreCase = true) ||
+                            r.gradeClass.contains(searchQuery, ignoreCase = true) ||
+                            r.dvbsDay.contains(searchQuery, ignoreCase = true))
+        }
+    }
+
+    val filteredResources = remember(resources, searchQuery, selectedDayFilter) {
+        resources.filter { r ->
+            (selectedDayFilter == null || r.dvbsDay == selectedDayFilter) &&
+                    (searchQuery.isBlank() ||
+                            r.teacherName.contains(searchQuery, ignoreCase = true) ||
+                            r.grade.contains(searchQuery, ignoreCase = true) ||
+                            r.dvbsDay.contains(searchQuery, ignoreCase = true))
         }
     }
 
@@ -124,10 +159,12 @@ fun DVBSScreen(
                 .fillMaxSize()
                 .padding(16.dp)
         ) {
-            val titleText = if (effectiveMode == DVBSViewMode.REGISTRATIONS) 
-                "Child Registrations" 
-            else 
-                "Resource Entries"
+            val titleText = when (userRole) {
+                "admin" -> "DVBS Admin Insights"
+                "registration" -> "My Registrations"
+                "resource" -> "My Resource Entries"
+                else -> if (effectiveMode == DVBSViewMode.REGISTRATIONS) "Child Registrations" else "Resource Entries"
+            }
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -141,9 +178,6 @@ fun DVBSScreen(
                     color = contentColor,
                     modifier = Modifier.weight(1f)
                 )
-                IconButton(onClick = { onRefresh() }) {
-                    Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = primaryColor)
-                }
                 if (userRole == "admin") {
                     val context = LocalContext.current
                     IconButton(onClick = {
@@ -160,103 +194,136 @@ fun DVBSScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // --- SEARCH BAR ---
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp),
-                placeholder = { Text("Search by name, grade, or day...") },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                trailingIcon = {
-                    if (searchQuery.isNotEmpty()) {
-                        IconButton(onClick = { searchQuery = "" }) {
-                            Icon(Icons.Default.Clear, contentDescription = "Clear search")
+            if (userRole == "admin") {
+                if (isInitialLoading) {
+                    DVBSAnalyticsSkeleton(isDarkMode = isDarkMode)
+                } else {
+                    DVBSAdminAnalyticsDashboard(
+                        registrations = registrations,
+                        resources = resources,
+                        contentColor = contentColor,
+                        isDarkMode = isDarkMode
+                    )
+                }
+            } else {
+                // --- SEARCH BAR ---
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 12.dp),
+                    placeholder = { Text("Search by name, grade, or day...") },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { searchQuery = "" }) {
+                                Icon(Icons.Default.Clear, contentDescription = "Clear search")
+                            }
                         }
-                    }
-                },
-                singleLine = true,
-                shape = RoundedCornerShape(12.dp),
-                colors = TextFieldDefaults.colors(
-                    focusedContainerColor = if (isDarkMode) Color(0xFF2C2C2C) else Color.White,
-                    unfocusedContainerColor = if (isDarkMode) Color(0xFF2C2C2C) else Color.White,
-                    focusedIndicatorColor = primaryColor,
-                    cursorColor = primaryColor
+                    },
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = if (isDarkMode) Color(0xFF2C2C2C) else Color.White,
+                        unfocusedContainerColor = if (isDarkMode) Color(0xFF2C2C2C) else Color.White,
+                        focusedIndicatorColor = primaryColor,
+                        cursorColor = primaryColor
+                    )
                 )
-            )
 
-            PullToRefreshBox(
-                isRefreshing = isRefreshing,
-                onRefresh = { onRefresh() },
-                modifier = Modifier.fillMaxSize()
-            ) {
-                if (effectiveMode == DVBSViewMode.REGISTRATIONS) {
-                    if (filteredRegistrations.isEmpty()) {
-                        EmptyListPlaceholder(
-                            if (searchQuery.isEmpty()) "No registrations yet." else "No matches found for \"$searchQuery\"",
-                            contentColor
-                        )
-                    } else {
-                        val groupedRegistrations = filteredRegistrations.groupBy { it.dvbsDay }
-                            .toSortedMap(compareBy { it })
+                // --- DAY FILTER CHIPS ---
+                if (availableDays.isNotEmpty()) {
+                    DayFilterChipRow(
+                        days = availableDays,
+                        selectedDay = selectedDayFilter,
+                        onDaySelected = { day ->
+                            selectedDayFilter = if (selectedDayFilter == day) null else day
+                        },
+                        primaryColor = primaryColor,
+                        contentColor = contentColor,
+                        isDarkMode = isDarkMode
+                    )
+                }
 
-                        LazyColumn(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalArrangement = Arrangement.spacedBy(16.dp),
-                            contentPadding = PaddingValues(bottom = 80.dp)
-                        ) {
-                            groupedRegistrations.forEach { (day, dayRegistrations) ->
-                                item(key = day) {
-                                    DVBSRegistrationDayGroup(
-                                        day = day,
-                                        registrations = dayRegistrations,
-                                        contentColor = contentColor,
-                                        isDarkMode = isDarkMode,
-                                        isSearchActive = searchQuery.isNotBlank(),
-                                        isAdmin = userRole == "admin",
-                                        onEdit = { onNavigateToRegistrationEntry(it.id) },
-                                        onDelete = { 
-                                            itemToDeleteId = it.id
-                                            isDeletingRegistration = true
-                                            showDeleteDialog = true
-                                        }
-                                    )
+                Spacer(modifier = Modifier.height(4.dp))
+
+                PullToRefreshBox(
+                    isRefreshing = isRefreshing,
+                    onRefresh = { onRefresh() },
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    if (isInitialLoading) {
+                        DVBSListSkeleton(isDarkMode = isDarkMode)
+                    } else if (effectiveMode == DVBSViewMode.REGISTRATIONS) {
+                        if (filteredRegistrations.isEmpty()) {
+                            EmptyListPlaceholder(
+                                if (searchQuery.isEmpty() && selectedDayFilter == null) "No registrations yet." else "No matches found.",
+                                contentColor
+                            )
+                        } else {
+                            val currentUserEmail = FirebaseAuth.getInstance().currentUser?.email
+                            val myRegistrations = if (userRole == "registration") {
+                                filteredRegistrations.filter { it.registeredBy == currentUserEmail }
+                            } else filteredRegistrations
+
+                            val groupedRegistrations = myRegistrations.groupBy { it.dvbsDay }
+                                .toSortedMap()
+
+                            LazyColumn(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(16.dp),
+                                contentPadding = PaddingValues(bottom = 80.dp)
+                            ) {
+                                groupedRegistrations.forEach { (day, dayRegistrations) ->
+                                    item(key = day) {
+                                        DVBSRegistrationDayGroup(
+                                            day = day,
+                                            registrations = dayRegistrations,
+                                            contentColor = contentColor,
+                                            isDarkMode = isDarkMode,
+                                            isSearchActive = searchQuery.isNotBlank() || selectedDayFilter != null,
+                                            isAdmin = false, // Edit/Delete disabled here
+                                            onEdit = { onNavigateToRegistrationEntry(it.id) },
+                                            onDelete = { }
+                                        )
+                                    }
                                 }
                             }
                         }
-                    }
-                } else {
-                    if (filteredResources.isEmpty()) {
-                        EmptyListPlaceholder(
-                            if (searchQuery.isEmpty()) "No resource entries yet." else "No matches found for \"$searchQuery\"",
-                            contentColor
-                        )
                     } else {
-                        val groupedResources = filteredResources.groupBy { it.dvbsDay }
-                            .toSortedMap(compareBy { it })
+                        if (filteredResources.isEmpty()) {
+                            EmptyListPlaceholder(
+                                if (searchQuery.isEmpty() && selectedDayFilter == null) "No resource entries yet." else "No matches found.",
+                                contentColor
+                            )
+                        } else {
+                            val currentUserEmail = FirebaseAuth.getInstance().currentUser?.email
+                            val myResources = if (userRole == "resource") {
+                                filteredResources.filter { it.recordedBy == currentUserEmail }
+                            } else filteredResources
 
-                        LazyColumn(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalArrangement = Arrangement.spacedBy(16.dp),
-                            contentPadding = PaddingValues(bottom = 80.dp)
-                        ) {
-                            groupedResources.forEach { (day, dayResources) ->
-                                item(key = day) {
-                                    DVBSResourceDayGroup(
-                                        day = day,
-                                        resources = dayResources,
-                                        contentColor = contentColor,
-                                        isDarkMode = isDarkMode,
-                                        isSearchActive = searchQuery.isNotBlank(),
-                                        isAdmin = userRole == "admin",
-                                        onEdit = { onNavigateToResourceEntry(it.id) },
-                                        onDelete = {
-                                            itemToDeleteId = it.id
-                                            isDeletingRegistration = false
-                                            showDeleteDialog = true
-                                        }
-                                    )
+                            val groupedResources = myResources.groupBy { it.dvbsDay }
+                                .toSortedMap()
+
+                            LazyColumn(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(16.dp),
+                                contentPadding = PaddingValues(bottom = 80.dp)
+                            ) {
+                                groupedResources.forEach { (day, dayResources) ->
+                                    item(key = day) {
+                                        DVBSResourceDayGroup(
+                                            day = day,
+                                            resources = dayResources,
+                                            contentColor = contentColor,
+                                            isDarkMode = isDarkMode,
+                                            isSearchActive = searchQuery.isNotBlank() || selectedDayFilter != null,
+                                            isAdmin = false, // Edit/Delete disabled here
+                                            onEdit = { onNavigateToResourceEntry(it.id) },
+                                            onDelete = { }
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -304,41 +371,418 @@ fun DVBSScreen(
             }
         }
     }
+}
 
-    // Delete Confirmation Dialog
-    if (showDeleteDialog) {
-        AlertDialog(
-            onDismissRequest = { showDeleteDialog = false },
-            title = { Text("Confirm Delete") },
-            text = { Text("Are you sure you want to delete this entry? This action cannot be undone.") },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        itemToDeleteId?.let { id ->
-                            if (isDeletingRegistration) {
-                                dvbsViewModel.deleteDVBSRegistration(id)
-                            } else {
-                                dvbsViewModel.deleteDVBSResource(id)
-                            }
-                        }
-                        showDeleteDialog = false
-                        itemToDeleteId = null
-                    },
-                    colors = ButtonDefaults.textButtonColors(contentColor = Color.Red)
-                ) {
-                    Text("Delete")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDeleteDialog = false }) {
-                    Text("Cancel")
-                }
-            }
-        )
+/**
+ * Horizontal row of tappable day chips. Tapping the active chip again clears the filter.
+ */
+@Composable
+private fun DayFilterChipRow(
+    days: List<String>,
+    selectedDay: String?,
+    onDaySelected: (String?) -> Unit,
+    primaryColor: Color,
+    contentColor: Color,
+    isDarkMode: Boolean
+) {
+    LazyRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        contentPadding = PaddingValues(bottom = 8.dp)
+    ) {
+        items(days) { day ->
+            val selected = selectedDay == day
+            FilterChip(
+                selected = selected,
+                onClick = { onDaySelected(day) },
+                label = { Text(day.ifBlank { "Unspecified" }) },
+                colors = FilterChipDefaults.filterChipColors(
+                    containerColor = if (isDarkMode) Color(0xFF2C2C2C) else Color.White,
+                    labelColor = contentColor,
+                    selectedContainerColor = primaryColor,
+                    selectedLabelColor = Color.White
+                ),
+                border = FilterChipDefaults.filterChipBorder(
+                    enabled = true,
+                    selected = selected,
+                    borderColor = contentColor.copy(alpha = 0.2f),
+                    selectedBorderColor = primaryColor
+                )
+            )
+        }
     }
 }
 
-private fun exportRegistrationsToCSV(context: Context, registrations: List<DVBSRegistration>, dayLabel: String) {
+/**
+ * A subtle, looping shimmer brush for skeleton placeholders.
+ */
+@Composable
+private fun rememberShimmerBrush(isDarkMode: Boolean): Brush {
+    val transition = rememberInfiniteTransition(label = "shimmerTransition")
+    val translateAnim by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 600f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1100, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "shimmerTranslate"
+    )
+    val baseColor = if (isDarkMode) Color(0xFF2A2A2A) else Color(0xFFE2E2E2)
+    val highlightColor = if (isDarkMode) Color(0xFF3D3D3D) else Color(0xFFF2F2F2)
+    return Brush.linearGradient(
+        colors = listOf(baseColor, highlightColor, baseColor),
+        start = Offset(translateAnim - 300f, 0f),
+        end = Offset(translateAnim, 300f)
+    )
+}
+
+@Composable
+private fun ShimmerBlock(width: androidx.compose.ui.unit.Dp, height: androidx.compose.ui.unit.Dp, brush: Brush) {
+    Box(
+        modifier = Modifier
+            .width(width)
+            .height(height)
+            .clip(RoundedCornerShape(4.dp))
+            .background(brush)
+    )
+}
+
+/**
+ * Skeleton placeholder shown for the list screens while the first
+ * Firestore snapshot is still loading.
+ */
+@Composable
+private fun DVBSListSkeleton(isDarkMode: Boolean) {
+    val brush = rememberShimmerBrush(isDarkMode)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        repeat(3) {
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = if (isDarkMode) Color(0xFF1E1E1E) else Color.White
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    ShimmerBlock(width = 140.dp, height = 20.dp, brush = brush)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    ShimmerBlock(width = 90.dp, height = 14.dp, brush = brush)
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Skeleton placeholder shown for the admin analytics dashboard while
+ * the first Firestore snapshot is still loading.
+ */
+@Composable
+private fun DVBSAnalyticsSkeleton(isDarkMode: Boolean) {
+    val brush = rememberShimmerBrush(isDarkMode)
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        ShimmerBlock(width = 160.dp, height = 18.dp, brush = brush)
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+            repeat(2) {
+                Card(
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (isDarkMode) Color(0xFF1E1E1E) else Color.White
+                    ),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        ShimmerBlock(width = 24.dp, height = 24.dp, brush = brush)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        ShimmerBlock(width = 40.dp, height = 22.dp, brush = brush)
+                        Spacer(modifier = Modifier.height(6.dp))
+                        ShimmerBlock(width = 60.dp, height = 12.dp, brush = brush)
+                    }
+                }
+            }
+        }
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = if (isDarkMode) Color(0xFF1E1E1E) else Color.White
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        ) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                repeat(3) {
+                    ShimmerBlock(width = 220.dp, height = 18.dp, brush = brush)
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Text that counts up from 0 to [targetValue] whenever the target changes.
+ */
+@Composable
+private fun AnimatedCounterText(
+    targetValue: Int,
+    style: androidx.compose.ui.text.TextStyle,
+    color: Color = Color.Unspecified
+) {
+    var displayedValue by remember { mutableIntStateOf(0) }
+    LaunchedEffect(targetValue) {
+        val steps = 24
+        val stepDelayMs = 600L / steps
+        val startValue = displayedValue
+        for (i in 1..steps) {
+            displayedValue = startValue + ((targetValue - startValue) * i / steps)
+            delay(stepDelayMs)
+        }
+        displayedValue = targetValue
+    }
+    Text(displayedValue.toString(), style = style, fontWeight = FontWeight.Bold, color = color)
+}
+
+@Composable
+fun DVBSAdminAnalyticsDashboard(
+    registrations: List<DVBSRegistration>,
+    resources: List<DVBSResource>,
+    contentColor: Color,
+    isDarkMode: Boolean
+) {
+    // Deduplicate registrations by child name and parent phone (unique children)
+    val uniqueRegistrations = remember(registrations) {
+        registrations.distinctBy {
+            it.childName.lowercase().trim() + it.parentGuardianPhone.trim()
+        }
+    }
+
+    val totalChildrenRegistered = uniqueRegistrations.size
+    val totalSalvations = resources.sumOf { it.numNewSalvations }
+    val totalWorkers = resources.sumOf { it.numWorkers }
+
+    var selectedDayForDistribution by remember { mutableStateOf("All Days") }
+    val availableDays = remember(registrations) {
+        listOf("All Days") + registrations.map { it.dvbsDay }.distinct().sorted()
+    }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        contentPadding = PaddingValues(bottom = 24.dp)
+    ) {
+        item {
+            Text(
+                "Overall Statistics",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = contentColor
+            )
+        }
+
+        item {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                AnalyticsStatCard(
+                    label = "Unique Children",
+                    value = totalChildrenRegistered,
+                    icon = Icons.Default.Group,
+                    modifier = Modifier.weight(1f),
+                    isDarkMode = isDarkMode
+                )
+                AnalyticsStatCard(
+                    label = "New Salvations",
+                    value = totalSalvations,
+                    icon = Icons.Default.Add,
+                    modifier = Modifier.weight(1f),
+                    isDarkMode = isDarkMode,
+                    color = Color(0xFF43A047)
+                )
+            }
+        }
+
+        item {
+            Text(
+                "Unique Registrations by Day",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = contentColor,
+                modifier = Modifier.padding(top = 8.dp)
+            )
+        }
+
+        item {
+            // Logic to find first-time registrations per day
+            val uniquePerDay = registrations
+                .sortedBy { it.registrationDate } // Assuming registrationDate is sortable yyyy-MM-dd
+                .distinctBy { it.childName.lowercase().trim() + it.parentGuardianPhone.trim() }
+                .groupBy { it.dvbsDay }
+                .mapValues { it.value.size }
+                .toSortedMap()
+
+            SimpleBarChart(
+                data = uniquePerDay,
+                isDarkMode = isDarkMode,
+                barColor = Color(0xFF00796B) // Teal for unique growth
+            )
+        }
+
+        item {
+            Text(
+                "Daily Total Attendance (Raw)",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = contentColor,
+                modifier = Modifier.padding(top = 8.dp)
+            )
+        }
+
+        item {
+            SimpleBarChart(
+                data = resources.groupBy { it.dvbsDay }
+                    .mapValues { it.value.sumOf { r -> r.numChildren } }
+                    .toSortedMap(),
+                isDarkMode = isDarkMode
+            )
+        }
+
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "Grade Distribution",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = contentColor
+                )
+
+                var expanded by remember { mutableStateOf(false) }
+                Box {
+                    TextButton(onClick = { expanded = true }) {
+                        Text(selectedDayForDistribution, color = Color(0xFFC62828))
+                        Icon(Icons.Default.ExpandMore, contentDescription = null, tint = Color(0xFFC62828))
+                    }
+                    DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                        availableDays.forEach { day ->
+                            DropdownMenuItem(
+                                text = { Text(day) },
+                                onClick = {
+                                    selectedDayForDistribution = day
+                                    expanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        item {
+            val displayRegistrations = if (selectedDayForDistribution == "All Days") {
+                uniqueRegistrations
+            } else {
+                registrations.filter { it.dvbsDay == selectedDayForDistribution }
+            }
+
+            SimpleBarChart(
+                data = displayRegistrations.groupBy { it.gradeClass }
+                    .mapValues { it.value.size }
+                    .toSortedMap(),
+                isDarkMode = isDarkMode,
+                barColor = Color(0xFFFFA000)
+            )
+        }
+    }
+}
+
+@Composable
+fun AnalyticsStatCard(
+    label: String,
+    value: Int,
+    icon: ImageVector,
+    modifier: Modifier = Modifier,
+    isDarkMode: Boolean = false,
+    color: Color = Color(0xFFC62828)
+) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isDarkMode) Color(0xFF1E1E1E) else Color.White
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(24.dp))
+            Spacer(modifier = Modifier.height(8.dp))
+            AnimatedCounterText(targetValue = value, style = MaterialTheme.typography.headlineMedium)
+            Text(label, style = MaterialTheme.typography.labelSmall, textAlign = TextAlign.Center)
+        }
+    }
+}
+
+@Composable
+fun SimpleBarChart(
+    data: Map<String, Int>,
+    isDarkMode: Boolean,
+    barColor: Color = Color(0xFFC62828)
+) {
+    val maxValue = data.values.maxOrNull() ?: 1
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isDarkMode) Color(0xFF1E1E1E) else Color.White
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (data.isEmpty()) {
+                Text("No data available for chart", modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+            } else {
+                data.forEach { (label, value) ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(label, modifier = Modifier.width(80.dp), style = MaterialTheme.typography.labelMedium)
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(20.dp)
+                                .padding(horizontal = 8.dp)
+                        ) {
+                            // Background track
+                            Box(modifier = Modifier.fillMaxSize().background(Color.LightGray.copy(alpha = 0.3f), RoundedCornerShape(4.dp)))
+                            // Bar
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth(if (maxValue > 0) value.toFloat() / maxValue else 0f)
+                                    .fillMaxHeight()
+                                    .background(barColor, RoundedCornerShape(4.dp))
+                            )
+                        }
+                        Text(value.toString(), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    }
+}
+
+fun exportRegistrationsToCSV(context: Context, registrations: List<DVBSRegistration>, dayLabel: String) {
     val csvHeader = "Child Name,Age,Gender,Grade,Parent Name,Parent Phone,Event Date,DVBS Day,Registration Date,Registered By\n"
     val csvData = registrations.joinToString("\n") { r ->
         "${r.childName},${r.age},${r.gender},${r.gradeClass},${r.parentGuardianName},${r.parentGuardianPhone},${r.eventDate},${r.dvbsDay},${r.registrationDate},${r.registeredBy}"
@@ -347,7 +791,7 @@ private fun exportRegistrationsToCSV(context: Context, registrations: List<DVBSR
     shareFile(context, fileName, csvHeader + csvData)
 }
 
-private fun exportResourcesToCSV(context: Context, resources: List<DVBSResource>, dayLabel: String) {
+fun exportResourcesToCSV(context: Context, resources: List<DVBSResource>, dayLabel: String) {
     val csvHeader = "Date,Day,Grade,Teacher,Children,Salvations,Workers,Category,Recorded By\n"
     val csvData = resources.joinToString("\n") { r ->
         "${r.date},${r.dvbsDay},${r.grade},${r.teacherName},${r.numChildren},${r.numNewSalvations},${r.numWorkers},${r.genderCategory},${r.recordedBy}"
@@ -416,7 +860,7 @@ fun DVBSRegistrationDayGroup(
                         color = contentColor.copy(alpha = 0.7f)
                     )
                 }
-                
+
                 if (isAdmin) {
                     IconButton(onClick = {
                         exportRegistrationsToCSV(context, registrations, day.ifBlank { "unspecified" })
@@ -424,7 +868,7 @@ fun DVBSRegistrationDayGroup(
                         Icon(Icons.Default.Download, contentDescription = "Download Day CSV", tint = contentColor.copy(alpha = 0.6f))
                     }
                 }
-                
+
                 Icon(
                     imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
                     contentDescription = if (isExpanded) "Collapse" else "Expand",
@@ -505,7 +949,7 @@ private fun DVBSRegistrationDetailItem(
                 color = contentColor.copy(alpha = 0.8f)
             )
         }
-        
+
         if (isAdmin) {
             Row {
                 IconButton(onClick = onEdit) {
@@ -577,7 +1021,7 @@ fun DVBSResourceDayGroup(
                         color = contentColor.copy(alpha = 0.7f)
                     )
                 }
-                
+
                 if (isAdmin) {
                     IconButton(onClick = {
                         exportResourcesToCSV(context, resources, day.ifBlank { "unspecified" })
@@ -585,7 +1029,7 @@ fun DVBSResourceDayGroup(
                         Icon(Icons.Default.Download, contentDescription = "Download Day CSV", tint = contentColor.copy(alpha = 0.6f))
                     }
                 }
-                
+
                 Icon(
                     imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
                     contentDescription = if (isExpanded) "Collapse" else "Expand",
@@ -649,9 +1093,9 @@ private fun DVBSResourceItem(
             Text("•", color = contentColor.copy(alpha = 0.5f))
             Text("Teacher: ${resource.teacherName}", style = MaterialTheme.typography.bodyMedium, color = contentColor.copy(alpha = 0.7f))
         }
-        
+
         Spacer(modifier = Modifier.height(4.dp))
-        
+
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             StatItem("Children", resource.numChildren.toString())
             StatItem("Salvations", resource.numNewSalvations.toString())
@@ -660,9 +1104,29 @@ private fun DVBSResourceItem(
     }
 }
 
+/**
+ * Small stat readout with a press-scale + ripple so it reads as tappable
+ * feedback even though it's purely informational today. Wire onClick to
+ * something (e.g. a breakdown dialog) when you have a use for the tap.
+ */
 @Composable
-fun StatItem(label: String, value: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+fun StatItem(label: String, value: String, onClick: (() -> Unit)? = null) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(targetValue = if (isPressed) 0.9f else 1f, label = "statItemScale")
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .scale(scale)
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(
+                interactionSource = interactionSource,
+                indication = LocalIndication.current,
+                onClick = { onClick?.invoke() }
+            )
+            .padding(horizontal = 10.dp, vertical = 6.dp)
+    ) {
         Text(value, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyLarge)
         Text(label, style = MaterialTheme.typography.labelSmall)
     }

@@ -9,35 +9,43 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
 private val DarkColorScheme = darkColorScheme(
-    primary = Purple80,
-    secondary = PurpleGrey80,
-    tertiary = Pink80
+    primary = BrandRed,
+    onPrimary = Color.White,
+    secondary = BrandRed,
+    onSecondary = Color.White,
+    background = DarkBackground,
+    onBackground = OnDark,
+    surface = DarkSurface,
+    onSurface = OnDark,
+    surfaceVariant = DarkSurfaceVariant,
+    onSurfaceVariant = OnDark
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = Purple40,
-    secondary = PurpleGrey40,
-    tertiary = Pink40
-
-    /* Other default colors to override
-    background = Color(0xFFFFFBFE),
-    surface = Color(0xFFFFFBFE),
+    primary = BrandRed,
     onPrimary = Color.White,
+    secondary = BrandRed,
     onSecondary = Color.White,
-    onTertiary = Color.White,
-    onBackground = Color(0xFF1C1B1F),
-    onSurface = Color(0xFF1C1B1F),
-    */
+    background = LightBackground,
+    onBackground = OnLight,
+    surface = LightSurface,
+    onSurface = OnLight,
+    surfaceVariant = LightSurfaceVariant,
+    onSurfaceVariant = OnLight
 )
 
 @Composable
 fun NGONGTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = true,
+    // Dynamic color (Material You) is available on Android 12+, but it would
+    // override the church's brand red with a color derived from the user's
+    // wallpaper. Defaulting this off keeps the brand consistent; flip it to
+    // true only if per-user theming matters more than brand consistency here.
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val colorScheme = when {

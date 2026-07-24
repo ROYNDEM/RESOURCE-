@@ -258,16 +258,11 @@ fun AppNavigator(
                 }
             ) { padding ->
                 Box(modifier = Modifier.padding(padding)) {
-                    com.roy.ngong.ui.dvbs.DVBSScreen(
+                    com.roy.ngong.ui.dvbs.DVBSAdminResourceScreen(
                         dvbsViewModel = dvbsViewModel,
                         isDarkMode = isDarkMode,
-                        userRole = userRole,
-                        mode = com.roy.ngong.ui.dvbs.DVBSViewMode.RESOURCES,
-                        onNavigateToResourceEntry = { id -> 
+                        onNavigateToEntry = { id -> 
                             navController.navigate(AppDestinations.dvbsResourceEntryRoute(id)) 
-                        },
-                        onNavigateToRegistrationEntry = { id -> 
-                            navController.navigate(AppDestinations.dvbsRegistrationEntryRoute(id)) 
                         }
                     )
                 }
@@ -305,15 +300,10 @@ fun AppNavigator(
                 }
             ) { padding ->
                 Box(modifier = Modifier.padding(padding)) {
-                    com.roy.ngong.ui.dvbs.DVBSScreen(
+                    com.roy.ngong.ui.dvbs.DVBSAdminRegistrationScreen(
                         dvbsViewModel = dvbsViewModel,
                         isDarkMode = isDarkMode,
-                        userRole = userRole,
-                        mode = com.roy.ngong.ui.dvbs.DVBSViewMode.REGISTRATIONS,
-                        onNavigateToResourceEntry = { id -> 
-                            navController.navigate(AppDestinations.dvbsResourceEntryRoute(id)) 
-                        },
-                        onNavigateToRegistrationEntry = { id -> 
+                        onNavigateToEntry = { id ->
                             navController.navigate(AppDestinations.dvbsRegistrationEntryRoute(id)) 
                         }
                     )
