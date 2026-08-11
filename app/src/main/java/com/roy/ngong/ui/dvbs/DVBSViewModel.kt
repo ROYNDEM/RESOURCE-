@@ -218,4 +218,32 @@ class DVBSViewModel : ViewModel() {
             }
         }
     }
+
+    fun fixDay1Registrations() {
+        viewModelScope.launch {
+            try {
+                db.collection("dvbs_registrations")
+                    .whereEqualTo("eventDate", "2026-08-10")
+                    .get()
+                    .addOnSuccessListener { snapshot ->
+                        val batch = db.batch()
+                        var count = 0
+                        snapshot.documents.forEach { doc ->
+                            val dvbsDay = doc.getString("dvbsDay")
+                            if (dvbsDay != "Day 1") {
+                                batch.update(doc.reference, "dvbsDay", "Day 1")
+                                count++
+                            }
+                        }
+                        if (count > 0) {
+                            batch.commit().addOnSuccessListener {
+                                Log.d("DVBSViewModel", "Fixed $count registrations for Day 1")
+                            }
+                        }
+                    }
+            } catch (e: Exception) {
+                Log.e("DVBSViewModel", "Error fixing Day 1 registrations", e)
+            }
+        }
+    }
 }

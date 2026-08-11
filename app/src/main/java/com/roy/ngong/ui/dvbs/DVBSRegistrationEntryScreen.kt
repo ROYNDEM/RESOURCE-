@@ -51,7 +51,6 @@ fun DVBSRegistrationEntryScreen(
     val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
     var eventDate by rememberSaveable { mutableStateOf(sdf.format(Date())) }
     var dvbsDay by rememberSaveable { mutableStateOf("") }
-    var isUserSetDay by rememberSaveable { mutableStateOf(false) }
 
     fun calculateDvbsDay(dateStr: String): String {
         return when (dateStr) {
@@ -64,13 +63,11 @@ fun DVBSRegistrationEntryScreen(
         }
     }
 
-    // Auto-populate DVBS Day when eventDate changes, unless user manually set it
+    // Auto-populate DVBS Day when eventDate changes
     LaunchedEffect(eventDate) {
-        if (!isUserSetDay || dvbsDay.isBlank()) {
-            val autoDay = calculateDvbsDay(eventDate)
-            if (autoDay.isNotBlank()) {
-                dvbsDay = autoDay
-            }
+        val autoDay = calculateDvbsDay(eventDate)
+        if (autoDay.isNotBlank()) {
+            dvbsDay = autoDay
         }
     }
 
@@ -135,10 +132,9 @@ fun DVBSRegistrationEntryScreen(
             else -> null
         }
         gradeClassError = if (gradeClass.isBlank()) "Grade/Class cannot be empty" else null
-        parentNameError = if (parentGuardianName.isBlank()) "Parent/Guardian name cannot be empty" else null
+        parentNameError = null
         parentPhoneError = when {
-            parentGuardianPhone.isBlank() -> "Phone number cannot be empty"
-            parentGuardianPhone.length < 9 -> "Phone number must be at least 9 digits"
+            parentGuardianPhone.isNotBlank() && parentGuardianPhone.length < 9 -> "Phone number must be at least 9 digits"
             else -> null
         }
         dvbsDayError = if (dvbsDay.isBlank()) "DVBS day cannot be empty" else null
@@ -348,7 +344,7 @@ fun DVBSRegistrationEntryScreen(
                     parentGuardianName = it
                     parentNameError = null
                 },
-                label = { Text("Parent/Guardian's Name") },
+                label = { Text("Parent/Guardian's Name (Optional)") },
                 placeholder = { Text("e.g., Jane Doe") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
@@ -372,7 +368,7 @@ fun DVBSRegistrationEntryScreen(
                     }
                     parentPhoneError = null
                 },
-                label = { Text("Parent/Guardian's Phone Number") },
+                label = { Text("Parent/Guardian's Phone Number (Optional)") },
                 placeholder = { Text("e.g., +254712345678") },
                 modifier = Modifier.fillMaxWidth(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
@@ -401,13 +397,10 @@ fun DVBSRegistrationEntryScreen(
 
             OutlinedTextField(
                 value = dvbsDay,
-                onValueChange = {
-                    dvbsDay = it
-                    dvbsDayError = null
-                    isUserSetDay = true
-                },
+                onValueChange = { },
+                readOnly = true,
                 label = { Text("DVBS Day") },
-                placeholder = { Text("e.g., Day 1 or Monday") },
+                placeholder = { Text("Automatically calculated from date") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 isError = dvbsDayError != null,
@@ -451,7 +444,6 @@ fun DVBSRegistrationEntryScreen(
                     .height(48.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = primaryColor),
                 enabled = childName.isNotBlank() && ageString.isNotBlank() && gradeClass.isNotBlank()
-                        && parentGuardianName.isNotBlank() && parentGuardianPhone.isNotBlank()
                         && eventDate.isNotBlank() && dvbsDay.isNotBlank()
             ) {
                 Text(if (registrationId == null) "Register Child" else "Update Registration", color = Color.White, fontWeight = FontWeight.Bold)

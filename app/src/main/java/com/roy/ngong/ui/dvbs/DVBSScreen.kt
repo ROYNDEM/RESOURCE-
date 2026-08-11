@@ -199,6 +199,7 @@ fun DVBSScreen(
                     DVBSAnalyticsSkeleton(isDarkMode = isDarkMode)
                 } else {
                     DVBSAdminAnalyticsDashboard(
+                        dvbsViewModel = dvbsViewModel,
                         registrations = registrations,
                         resources = resources,
                         contentColor = contentColor,
@@ -553,11 +554,17 @@ private fun AnimatedCounterText(
 
 @Composable
 fun DVBSAdminAnalyticsDashboard(
+    dvbsViewModel: DVBSViewModel,
     registrations: List<DVBSRegistration>,
     resources: List<DVBSResource>,
     contentColor: Color,
     isDarkMode: Boolean
 ) {
+    // Automatically fix Day 1 data when admin views the dashboard
+    LaunchedEffect(Unit) {
+        dvbsViewModel.fixDay1Registrations()
+    }
+
     // Deduplicate registrations by child name and parent phone (unique children)
     val uniqueRegistrations = remember(registrations) {
         registrations.distinctBy {
@@ -566,6 +573,8 @@ fun DVBSAdminAnalyticsDashboard(
     }
 
     val totalChildrenRegistered = uniqueRegistrations.size
+    val totalBoys = uniqueRegistrations.count { it.gender.equals("Boy", ignoreCase = true) }
+    val totalGirls = uniqueRegistrations.count { it.gender.equals("Girl", ignoreCase = true) }
     val totalSalvations = resources.sumOf { it.numNewSalvations }
     val totalWorkers = resources.sumOf { it.numWorkers }
 
@@ -604,6 +613,27 @@ fun DVBSAdminAnalyticsDashboard(
                     modifier = Modifier.weight(1f),
                     isDarkMode = isDarkMode,
                     color = Color(0xFF43A047)
+                )
+            }
+        }
+
+        item {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                AnalyticsStatCard(
+                    label = "Total Boys",
+                    value = totalBoys,
+                    icon = Icons.Default.Person,
+                    modifier = Modifier.weight(1f),
+                    isDarkMode = isDarkMode,
+                    color = Color(0xFF1976D2)
+                )
+                AnalyticsStatCard(
+                    label = "Total Girls",
+                    value = totalGirls,
+                    icon = Icons.Default.Person,
+                    modifier = Modifier.weight(1f),
+                    isDarkMode = isDarkMode,
+                    color = Color(0xFFE91E63)
                 )
             }
         }
