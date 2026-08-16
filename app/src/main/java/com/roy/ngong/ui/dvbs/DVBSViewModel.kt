@@ -8,10 +8,12 @@ import com.roy.ngong.data.DVBSRecord
 import com.roy.ngong.data.DVBSRegistration
 import com.roy.ngong.data.DVBSResource
 import com.roy.ngong.data.DVBSStatistics
+import com.google.firebase.firestore.Query
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import android.util.Log
+import kotlinx.coroutines.tasks.await
 
 class DVBSViewModel : ViewModel() {
     private val db = Firebase.firestore
@@ -91,7 +93,7 @@ class DVBSViewModel : ViewModel() {
     private fun listenForRegistrations() {
         registrationsListener?.remove()
         registrationsListener = db.collection("dvbs_registrations")
-            .orderBy("registrationDate", com.google.firebase.firestore.Query.Direction.DESCENDING)
+            .orderBy("registrationDate", Query.Direction.DESCENDING)
             .addSnapshotListener { snapshot, e ->
                 if (e != null) {
                     Log.e("DVBSViewModel", "Error listening for DVBS registrations", e)
@@ -219,31 +221,58 @@ class DVBSViewModel : ViewModel() {
         }
     }
 
-    fun fixDay1Registrations() {
+    fun cleanupOctoberDates() {
         viewModelScope.launch {
             try {
-                db.collection("dvbs_registrations")
-                    .whereEqualTo("eventDate", "2026-08-10")
-                    .get()
-                    .addOnSuccessListener { snapshot ->
-                        val batch = db.batch()
-                        var count = 0
-                        snapshot.documents.forEach { doc ->
-                            val dvbsDay = doc.getString("dvbsDay")
-                            if (dvbsDay != "Day 1") {
-                                batch.update(doc.reference, "dvbsDay", "Day 1")
-                                count++
-                            }
-                        }
-                        if (count > 0) {
-                            batch.commit().addOnSuccessListener {
-                                Log.d("DVBSViewModel", "Fixed $count registrations for Day 1")
-                            }
-                        }
+                val batch = db.batch()
+                var totalCount = 0
+
+                // 1. Cleanup Registrations
+                val registrationSnapshot = db.collection("dvbs_registrations").get().await()
+                registrationSnapshot.documents.forEach { doc ->
+                    val date = doc.getString("eventDate") ?: ""
+                    val dvbsDay = doc.getString("dvbsDay") ?: ""
+                    
+                    val (newDate, newDay) = getCorrectedDateAndDay(date)
+                    if (newDate != null && (date != newDate || dvbsDay != newDay)) {
+                        batch.update(doc.reference, "eventDate", newDate)
+                        batch.update(doc.reference, "dvbsDay", newDay)
+                        totalCount++
                     }
+                }
+
+                // 2. Cleanup Resource entries
+                val resourceSnapshot = db.collection("dvbs_resources").get().await()
+                resourceSnapshot.documents.forEach { doc ->
+                    val date = doc.getString("date") ?: ""
+                    val dvbsDay = doc.getString("dvbsDay") ?: ""
+                    
+                    val (newDate, newDay) = getCorrectedDateAndDay(date)
+                    if (newDate != null && (date != newDate || dvbsDay != newDay)) {
+                        batch.update(doc.reference, "date", newDate)
+                        batch.update(doc.reference, "dvbsDay", newDay)
+                        totalCount++
+                    }
+                }
+
+                if (totalCount > 0) {
+                    batch.commit().await()
+                    Log.d("DVBSViewModel", "Data Cleanup: Fixed $totalCount entries (Oct -> Aug)")
+                }
             } catch (e: Exception) {
-                Log.e("DVBSViewModel", "Error fixing Day 1 registrations", e)
+                Log.e("DVBSViewModel", "Error in cleanupOctoberDates", e)
             }
+        }
+    }
+
+    private fun getCorrectedDateAndDay(currentDate: String): Pair<String?, String?> {
+        return when {
+            currentDate.startsWith("2026-10-10") || currentDate.startsWith("2026-08-10") -> "2026-08-10" to "Day 1"
+            currentDate.startsWith("2026-10-11") || currentDate.startsWith("2026-08-11") -> "2026-08-11" to "Day 2"
+            currentDate.startsWith("2026-10-12") || currentDate.startsWith("2026-08-12") -> "2026-08-12" to "Day 3"
+            currentDate.startsWith("2026-10-13") || currentDate.startsWith("2026-08-13") -> "2026-08-13" to "Day 4"
+            currentDate.startsWith("2026-10-14") || currentDate.startsWith("2026-08-14") -> "2026-08-14" to "Day 5"
+            else -> null to null
         }
     }
 }

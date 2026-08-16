@@ -78,7 +78,6 @@ fun DVBSScreen(
 ) {
     val registrations by dvbsViewModel.dvbsRegistrations.collectAsState()
     val resources by dvbsViewModel.dvbsResources.collectAsState()
-
     val primaryColor = Color(0xFFC62828)
     val lightModeBackground = Color(0xFFF0F0F0)
     val darkModeBackground = Color.Black
@@ -201,7 +200,6 @@ fun DVBSScreen(
                     DVBSAdminAnalyticsDashboard(
                         dvbsViewModel = dvbsViewModel,
                         registrations = registrations,
-                        resources = resources,
                         contentColor = contentColor,
                         isDarkMode = isDarkMode
                     )
@@ -556,32 +554,36 @@ private fun AnimatedCounterText(
 fun DVBSAdminAnalyticsDashboard(
     dvbsViewModel: DVBSViewModel,
     registrations: List<DVBSRegistration>,
-    resources: List<DVBSResource>,
     contentColor: Color,
     isDarkMode: Boolean
 ) {
-    // Automatically fix Day 1 data when admin views the dashboard
+    // Automatically cleanup data when admin views the dashboard
     LaunchedEffect(Unit) {
-        dvbsViewModel.fixDay1Registrations()
+        dvbsViewModel.cleanupOctoberDates()
     }
 
-    // Deduplicate registrations by child name and parent phone (unique children)
-    val uniqueRegistrations = remember(registrations) {
-        registrations.distinctBy {
-            it.childName.lowercase().trim() + it.parentGuardianPhone.trim()
+    var selectedDayFilter by remember { mutableStateOf("All Days") }
+    val availableDays = listOf("All Days", "Day 1", "Day 2", "Day 3", "Day 4", "Day 5")
+
+    val primaryColor = Color(0xFFC62828)
+
+    // Calculate stats from the full registrations list
+    val filteredForDashboard = remember(registrations, selectedDayFilter) {
+        if (selectedDayFilter == "All Days") registrations
+        else registrations.filter { it.dvbsDay == selectedDayFilter }
+    }
+
+    val totalCount = remember(filteredForDashboard, selectedDayFilter) {
+        if (selectedDayFilter == "All Days") {
+            filteredForDashboard.distinctBy { it.childName.lowercase().trim() + it.parentGuardianPhone.trim() }.size
+        } else {
+            filteredForDashboard.size
         }
     }
 
-    val totalChildrenRegistered = uniqueRegistrations.size
-    val totalBoys = uniqueRegistrations.count { it.gender.equals("Boy", ignoreCase = true) }
-    val totalGirls = uniqueRegistrations.count { it.gender.equals("Girl", ignoreCase = true) }
-    val totalSalvations = resources.sumOf { it.numNewSalvations }
-    val totalWorkers = resources.sumOf { it.numWorkers }
-
-    var selectedDayForDistribution by remember { mutableStateOf("All Days") }
-    val availableDays = remember(registrations) {
-        listOf("All Days") + registrations.map { it.dvbsDay }.distinct().sorted()
-    }
+    val boyCount = filteredForDashboard.count { it.gender.equals("Boy", ignoreCase = true) }
+    val girlCount = filteredForDashboard.count { it.gender.equals("Girl", ignoreCase = true) }
+    val gradeDistribution = filteredForDashboard.groupBy { it.gradeClass }.mapValues { it.value.size }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -589,108 +591,13 @@ fun DVBSAdminAnalyticsDashboard(
         contentPadding = PaddingValues(bottom = 24.dp)
     ) {
         item {
-            Text(
-                "Overall Statistics",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = contentColor
-            )
-        }
-
-        item {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                AnalyticsStatCard(
-                    label = "Unique Children",
-                    value = totalChildrenRegistered,
-                    icon = Icons.Default.Group,
-                    modifier = Modifier.weight(1f),
-                    isDarkMode = isDarkMode
-                )
-                AnalyticsStatCard(
-                    label = "New Salvations",
-                    value = totalSalvations,
-                    icon = Icons.Default.Add,
-                    modifier = Modifier.weight(1f),
-                    isDarkMode = isDarkMode,
-                    color = Color(0xFF43A047)
-                )
-            }
-        }
-
-        item {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                AnalyticsStatCard(
-                    label = "Total Boys",
-                    value = totalBoys,
-                    icon = Icons.Default.Person,
-                    modifier = Modifier.weight(1f),
-                    isDarkMode = isDarkMode,
-                    color = Color(0xFF1976D2)
-                )
-                AnalyticsStatCard(
-                    label = "Total Girls",
-                    value = totalGirls,
-                    icon = Icons.Default.Person,
-                    modifier = Modifier.weight(1f),
-                    isDarkMode = isDarkMode,
-                    color = Color(0xFFE91E63)
-                )
-            }
-        }
-
-        item {
-            Text(
-                "Unique Registrations by Day",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = contentColor,
-                modifier = Modifier.padding(top = 8.dp)
-            )
-        }
-
-        item {
-            // Logic to find first-time registrations per day
-            val uniquePerDay = registrations
-                .sortedBy { it.registrationDate } // Assuming registrationDate is sortable yyyy-MM-dd
-                .distinctBy { it.childName.lowercase().trim() + it.parentGuardianPhone.trim() }
-                .groupBy { it.dvbsDay }
-                .mapValues { it.value.size }
-                .toSortedMap()
-
-            SimpleBarChart(
-                data = uniquePerDay,
-                isDarkMode = isDarkMode,
-                barColor = Color(0xFF00796B) // Teal for unique growth
-            )
-        }
-
-        item {
-            Text(
-                "Daily Total Attendance (Raw)",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = contentColor,
-                modifier = Modifier.padding(top = 8.dp)
-            )
-        }
-
-        item {
-            SimpleBarChart(
-                data = resources.groupBy { it.dvbsDay }
-                    .mapValues { it.value.sumOf { r -> r.numChildren } }
-                    .toSortedMap(),
-                isDarkMode = isDarkMode
-            )
-        }
-
-        item {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    "Grade Distribution",
+                    "Overall Statistics",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = contentColor
@@ -699,15 +606,15 @@ fun DVBSAdminAnalyticsDashboard(
                 var expanded by remember { mutableStateOf(false) }
                 Box {
                     TextButton(onClick = { expanded = true }) {
-                        Text(selectedDayForDistribution, color = Color(0xFFC62828))
-                        Icon(Icons.Default.ExpandMore, contentDescription = null, tint = Color(0xFFC62828))
+                        Text(selectedDayFilter, color = primaryColor)
+                        Icon(Icons.Default.ExpandMore, contentDescription = null, tint = primaryColor)
                     }
                     DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                         availableDays.forEach { day ->
                             DropdownMenuItem(
                                 text = { Text(day) },
                                 onClick = {
-                                    selectedDayForDistribution = day
+                                    selectedDayFilter = day
                                     expanded = false
                                 }
                             )
@@ -718,16 +625,73 @@ fun DVBSAdminAnalyticsDashboard(
         }
 
         item {
-            val displayRegistrations = if (selectedDayForDistribution == "All Days") {
-                uniqueRegistrations
-            } else {
-                registrations.filter { it.dvbsDay == selectedDayForDistribution }
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                AnalyticsStatCard(
+                    label = if (selectedDayFilter == "All Days") "Unique Children" else "Day Registrations",
+                    value = totalCount,
+                    icon = Icons.Default.Group,
+                    modifier = Modifier.weight(1f),
+                    isDarkMode = isDarkMode
+                )
             }
+        }
+
+        item {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                AnalyticsStatCard(
+                    label = "Total Boys",
+                    value = boyCount,
+                    icon = Icons.Default.Person,
+                    modifier = Modifier.weight(1f),
+                    isDarkMode = isDarkMode,
+                    color = Color(0xFF1976D2)
+                )
+                AnalyticsStatCard(
+                    label = "Total Girls",
+                    value = girlCount,
+                    icon = Icons.Default.Person,
+                    modifier = Modifier.weight(1f),
+                    isDarkMode = isDarkMode,
+                    color = Color(0xFFE91E63)
+                )
+            }
+        }
+
+        item {
+            Text(
+                "Total Registrations by Day",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = contentColor,
+                modifier = Modifier.padding(top = 8.dp)
+            )
+        }
+
+        item {
+            val dailyRawCounts = registrations.groupBy { it.dvbsDay }
+                .mapValues { it.value.size }
+                .toSortedMap()
 
             SimpleBarChart(
-                data = displayRegistrations.groupBy { it.gradeClass }
-                    .mapValues { it.value.size }
-                    .toSortedMap(),
+                data = dailyRawCounts,
+                isDarkMode = isDarkMode,
+                barColor = Color(0xFF00796B)
+            )
+        }
+
+        item {
+            Text(
+                "Grade Distribution (${selectedDayFilter})",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = contentColor,
+                modifier = Modifier.padding(top = 8.dp)
+            )
+        }
+
+        item {
+            SimpleBarChart(
+                data = gradeDistribution.toSortedMap(),
                 isDarkMode = isDarkMode,
                 barColor = Color(0xFFFFA000)
             )
