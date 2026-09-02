@@ -39,8 +39,8 @@ import com.roy.ngong.R
 import com.roy.ngong.navigation.AppDestinations
 import com.roy.ngong.ui.admin.AppDataViewModel
 import com.roy.ngong.ui.admin.AuthViewModel
-import com.roy.ngong.ui.dvbs.DVBSScreen
-import com.roy.ngong.ui.dvbs.DVBSViewModel
+// import com.roy.ngong.ui.dvbs.DVBSScreen
+// import com.roy.ngong.ui.dvbs.DVBSViewModel
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -79,12 +79,12 @@ fun HomeScreen(
     val isAdmin by authViewModel.isAdmin.collectAsState()
 
     var isRefreshing by remember { mutableStateOf(false) }
-    val dvbsViewModel: DVBSViewModel = viewModel()
+    // val dvbsViewModel: DVBSViewModel = viewModel()
 
     val onRefresh = {
         scope.launch {
             isRefreshing = true
-            dvbsViewModel.startListening()
+            // dvbsViewModel.startListening()
             // appDataViewModel listener is automatic, but we can't easily "force" it without more complex logic
             // or re-initializing the ViewModel, but snapshot listeners are usually fine.
             delay(1000)
@@ -134,7 +134,7 @@ fun HomeScreen(
         }
     ) {
         val data by appDataViewModel.generalData.collectAsState()
-        val pagerState = rememberPagerState(pageCount = { 2 })
+        // val pagerState = rememberPagerState(pageCount = { 2 })
 
         Scaffold(
             topBar = {
@@ -148,20 +148,20 @@ fun HomeScreen(
                         onLogoutClick = onLogout,
                         onRefreshClick = onRefresh
                     )
-                    PagerIndicator(
+                    /* PagerIndicator(
                         pageCount = pagerState.pageCount,
                         currentPage = pagerState.currentPage,
                         selectedColor = primaryColor,
                         unselectedColor = if (isDarkMode) Color.White.copy(alpha = 0.3f) else Color.Black.copy(alpha = 0.2f)
-                    )
+                    ) */
                 }
             },
             floatingActionButton = {
-                AnimatedVisibility(
-                    visible = pagerState.currentPage == 0,
-                    enter = scaleIn() + fadeIn(),
-                    exit = scaleOut() + fadeOut()
-                ) {
+                // AnimatedVisibility(
+                //     visible = pagerState.currentPage == 0,
+                //     enter = scaleIn() + fadeIn(),
+                //     exit = scaleOut() + fadeOut()
+                // ) {
                     FloatingActionButton(
                         onClick = { navController.navigate(AppDestinations.RESOURCE_ENTRY_ROUTE) },
                         containerColor = primaryColor
@@ -172,7 +172,7 @@ fun HomeScreen(
                             tint = Color.White
                         )
                     }
-                }
+                // }
             },
             containerColor = if (isDarkMode) darkModeBackground else lightModeBackground
         ) { paddingValues ->
@@ -181,12 +181,12 @@ fun HomeScreen(
                 onRefresh = onRefresh,
                 modifier = Modifier.padding(paddingValues)
             ) {
-                HorizontalPager(
-                    state = pagerState,
-                    modifier = Modifier.fillMaxSize()
-                ) { page ->
-                    when (page) {
-                        0 -> {
+                // HorizontalPager(
+                //    state = pagerState,
+                //    modifier = Modifier.fillMaxSize()
+                // ) { page ->
+                //    when (page) {
+                //        0 -> {
                             Column(
                                 modifier = Modifier
                                     .fillMaxSize()
@@ -210,7 +210,7 @@ fun HomeScreen(
                                     surfaceColor = if (isDarkMode) darkModeSurface else lightModeSurface
                                 )
 
-                                Box(
+                                /* Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .padding(vertical = 16.dp),
@@ -222,20 +222,20 @@ fun HomeScreen(
                                         color = if (isDarkMode) Color.White.copy(alpha = 0.5f)
                                         else Color.Black.copy(alpha = 0.5f)
                                     )
-                                }
+                                } */
                             }
-                        }
-                        1 -> {
-                            DVBSScreen(
-                                dvbsViewModel = dvbsViewModel,
-                                isDarkMode = isDarkMode,
-                                userRole = userRole,
-                                onNavigateToResourceEntry = onNavigateToDVBSResourceEntry,
-                                onNavigateToRegistrationEntry = onNavigateToDVBSRegistrationEntry
-                            )
-                        }
-                    }
-                }
+                //        }
+                //        1 -> {
+                //            DVBSScreen(
+                //                dvbsViewModel = dvbsViewModel,
+                //                isDarkMode = isDarkMode,
+                //                userRole = userRole,
+                //                onNavigateToResourceEntry = onNavigateToDVBSResourceEntry,
+                //                onNavigateToRegistrationEntry = onNavigateToDVBSRegistrationEntry
+                //            )
+                //        }
+                //    }
+                // }
             }
         }
     }
@@ -450,8 +450,8 @@ private fun AppDrawerContent(
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
-            // Only show DVBS management menu to Admins
-            if (isAdmin || userRole == "admin") {
+            // Only show DVBS management menu to Admins - DEACTIVATED FOR NOW
+            /* if (isAdmin || userRole == "admin") {
                 DVBSCollapsibleMenu(
                     buttonSurface = buttonSurface,
                     subButtonSurface = subButtonSurface,
@@ -460,7 +460,7 @@ private fun AppDrawerContent(
                     onDVBSResourcesClick = onDVBSResourcesClick
                 )
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-            }
+            } */
 
             // Only show Admin Dashboard to system admins
             if (isAdmin) {

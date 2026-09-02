@@ -199,6 +199,7 @@ fun AppNavigator(
             )
         }
 
+        /* 
         composable(
             route = "dvbs_resource_entry?id={id}",
             arguments = listOf(navArgument("id") { nullable = true; defaultValue = null })
@@ -309,7 +310,8 @@ fun AppNavigator(
                     )
                 }
             }
-        }
+        } 
+        */
 
         composable(route = AppDestinations.RESOURCE_EDIT_ROUTE) {
             ResourceEditScreen(
